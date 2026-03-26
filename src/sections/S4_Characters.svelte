@@ -46,19 +46,20 @@
     assigns 1 to everything. The others are more interesting.</p>
   </div>
 
-  <h3>Characters as oscillating signals</h3>
+  <h3>Characters as rotating phasors</h3>
 
-  <p>Think of each character as a signal that oscillates as you sweep through the integers.
-  The <strong>principal character</strong> <Tex tex="\chi_0" /> is the "DC component" — a flat signal
-  at 1 for every coprime number. The other characters oscillate at different frequencies, just
-  like the harmonics in a Fourier decomposition.</p>
+  <p>Each character is a <strong>complex exponential</strong> — a phasor that rotates around the
+  unit circle as you sweep the input <Tex tex="x" /> from 0 to <Tex tex="q" />:</p>
 
-  <p>Press play to watch the character phasors rotate on the complex plane as <Tex tex="n" /> advances.
-  The waveforms below show each character's real part (solid) and imaginary part (dashed) as a function of <Tex tex="n" />.
-  Notice how the non-principal characters oscillate while <Tex tex="\chi_0" /> stays flat.</p>
+  <Tex display tex={String.raw`\chi_k(x) = e^{2\pi i \cdot a_k \cdot x / q}`} />
+
+  <p>The <strong>principal character</strong> <Tex tex="\chi_0" /> has frequency 0, so its phasor
+  points right (value 1) everywhere. Each successive character has a higher frequency <Tex tex="a_k" />,
+  so the phasor spins faster. The strips below show this — the arrows are the phasor at each
+  point along the x-axis, and the traces show the real and imaginary parts of the swept signal.
+  At the coprime integer residues (tick marks), the arrow hits the exact character value.</p>
 
   <div class="viz-container">
-    <Slider label="Range" bind:value={phasorMaxN} min={20} max={120} step={10} format={v => `n = 1..${v}`} />
     <CharacterPhasors {q} maxN={phasorMaxN} />
   </div>
 

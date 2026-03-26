@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from 'svelte';
-  import { dirichletCharacters } from '../../lib/characters.js';
+  import { dirichletCharacters, characterContinuousData, evalCharacterContinuous } from '../../lib/characters.js';
   import { coprimeResidues, gcd } from '../../lib/math-utils.js';
   import { isPrime } from '../../lib/primes.js';
 
@@ -10,165 +10,87 @@
   $: characters = dirichletCharacters(q);
   $: residues = coprimeResidues(q);
   $: phi = residues.length;
-
-  // Evaluate each character at every integer from 1..maxN
-  $: waveforms = characters.map((chi, idx) => {
-    const points = [];
-    for (let n = 1; n <= maxN; n++) {
-      const val = chi.values.get(((n % q) + q) % q) || [0, 0];
-      points.push({ n, re: val[0], im: val[1], coprime: gcd(n, q) === 1, prime: isPrime(n) });
-    }
-    return { chi, points, index: idx };
-  });
-
-  // Build the coprime sequence with sequential index
-  $: coprimeSeq = (() => {
-    const seq = [];
-    for (let n = 1; n <= maxN; n++) {
-      if (gcd(n, q) === 1) {
-        seq.push({ n, idx: seq.length, prime: isPrime(n) });
-      }
-    }
-    return seq;
-  })();
-
-  // For each character, get its values at the coprime sequence points.
-  // These are periodic with period phi(q). The continuous interpolation
-  // uses trigonometric (Fourier) interpolation: since the character values
-  // ARE a single Fourier mode on the group, the exact interpolant through
-  // one period is a sinusoid. We reconstruct it via DFT interpolation.
-  //
-  // For one period of phi values y_0..y_{phi-1}, the trig interpolant at
-  // fractional position t (0 <= t < phi) is:
-  //   y(t) = (1/phi) * sum_{k=0}^{phi-1} Y_k * exp(2*pi*i*k*t/phi)
-  // where Y_k = sum_{j=0}^{phi-1} y_j * exp(-2*pi*i*k*j/phi) is the DFT.
-  //
-  // But since each character IS a single frequency, this simplifies enormously.
-  // We just precompute the DFT of one period and evaluate.
-
-  function trigInterp(samples, t) {
-    // samples: array of [re, im] of length phi
-    // t: continuous index (0 = first sample, 1 = second, etc.)
-    // Returns interpolated [re, im]
-    const N = samples.length;
-    if (N === 0) return [0, 0];
-    if (N === 1) return samples[0];
-
-    // Direct evaluation of trig interpolation (Dirichlet kernel form):
-    // y(t) = (1/N) * sum_{j=0}^{N-1} y_j * D_N(t - j)
-    // where D_N(x) = sum_{k=0}^{N-1} exp(2*pi*i*k*x/N) = sin(pi*x) / sin(pi*x/N) * exp(i*pi*x*(N-1)/N)
-    // For real + imaginary parts, we use the real Dirichlet kernel:
-    // D_N(x) = sin(N*pi*x/N) / sin(pi*x/N) when x is not integer = N when x is integer
-    // Actually the periodic sinc (Dirichlet kernel) for even/odd N differs.
-    //
-    // Simpler: just evaluate the DFT formula directly.
-    let re = 0, im = 0;
-    for (let k = 0; k < N; k++) {
-      // Compute DFT coefficient Y_k
-      let Yre = 0, Yim = 0;
-      for (let j = 0; j < N; j++) {
-        const angle = -2 * Math.PI * k * j / N;
-        const c = Math.cos(angle), s = Math.sin(angle);
-        Yre += samples[j][0] * c - samples[j][1] * s;
-        Yim += samples[j][0] * s + samples[j][1] * c;
-      }
-      // Multiply by exp(2*pi*i*k*t/N) / N
-      const angle2 = 2 * Math.PI * k * t / N;
-      const c2 = Math.cos(angle2), s2 = Math.sin(angle2);
-      re += (Yre * c2 - Yim * s2) / N;
-      im += (Yre * s2 + Yim * c2) / N;
-    }
-    return [re, im];
-  }
-
-  // For each character, extract one period of samples (at the coprime residues)
-  $: periodSamples = characters.map(chi => {
-    return residues.map(r => chi.values.get(r) || [0, 0]);
-  });
-
-  // Precompute DFT coefficients for each character (avoid recomputing per curve point)
-  $: dftCoeffs = periodSamples.map(samples => {
-    const N = samples.length;
-    const coeffs = [];
-    for (let k = 0; k < N; k++) {
-      let Yre = 0, Yim = 0;
-      for (let j = 0; j < N; j++) {
-        const angle = -2 * Math.PI * k * j / N;
-        Yre += samples[j][0] * Math.cos(angle) - samples[j][1] * Math.sin(angle);
-        Yim += samples[j][0] * Math.sin(angle) + samples[j][1] * Math.cos(angle);
-      }
-      coeffs.push([Yre, Yim]);
-    }
-    return coeffs;
-  });
-
-  // Fast trig interpolation using precomputed DFT
-  function trigInterpFast(coeffs, N, t) {
-    let re = 0, im = 0;
-    for (let k = 0; k < N; k++) {
-      const angle = 2 * Math.PI * k * t / N;
-      const c = Math.cos(angle), s = Math.sin(angle);
-      re += (coeffs[k][0] * c - coeffs[k][1] * s) / N;
-      im += (coeffs[k][0] * s + coeffs[k][1] * c) / N;
-    }
-    return [re, im];
-  }
-
-  // Generate continuous curve for a character.
-  // x-axis = integer n, but the sinusoid is parameterized by the sequential
-  // coprime index. Between coprime integers we interpolate the index linearly
-  // in x-space, and evaluate the trig interpolant at the fractional index.
-  function continuousSinePath(charIdx, part) {
-    const coeffs = dftCoeffs[charIdx];
-    if (!coeffs || coprimeSeq.length < 2) return '';
-    const N = phi;
-    const samplesPerSegment = 16;
-    const points = [];
-
-    for (let k = 0; k < coprimeSeq.length - 1; k++) {
-      const n0 = coprimeSeq[k].n;
-      const n1 = coprimeSeq[k + 1].n;
-      const t0 = k; // sequential index of first point
-      const t1 = k + 1;
-
-      for (let s = 0; s <= samplesPerSegment; s++) {
-        if (s === samplesPerSegment && k < coprimeSeq.length - 2) continue;
-        const frac = s / samplesPerSegment;
-        const x = n0 + (n1 - n0) * frac;
-        const t = t0 + (t1 - t0) * frac;
-        const val = trigInterpFast(coeffs, N, t);
-        points.push({ x, y: part === 're' ? val[0] : val[1] });
-      }
-    }
-
-    if (points.length === 0) return '';
-    return points.map((p, i) =>
-      `${i === 0 ? 'M' : 'L'}${xScale(p.x)},${yScale(p.y)}`
-    ).join(' ');
-  }
+  $: contData = characterContinuousData(q);
 
   const charColors = [
     '#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444',
     '#06b6d4', '#84cc16', '#f97316', '#a855f7'
   ];
 
-  // Waveform plot dimensions
-  const waveW = 700;
-  const waveH = 110;
-  const waveMargin = { left: 50, right: 15, top: 8, bottom: 22 };
-  const waveInner = waveW - waveMargin.left - waveMargin.right;
-  const waveInnerH = waveH - waveMargin.top - waveMargin.bottom;
+  // ─── Phasor strip visualization ───────────────────────────────
+  // For each character, draw a horizontal strip where:
+  //   x-axis: continuous parameter x from 0 to q
+  //   At each x, draw a short phasor arrow showing e^{2πi·freq·x/order}
+  //   At integer coprime residues, draw a highlighted node
+  //
+  // This is the "phasor sweep" — you see the arrow rotating as x advances.
 
-  $: xScale = (n) => waveMargin.left + ((n - 1) / (maxN - 1)) * waveInner;
-  $: yScale = (v) => waveMargin.top + waveInnerH / 2 - v * (waveInnerH / 2) * 0.9;
+  const stripW = 700;
+  const stripH = 80;
+  const stripMargin = { left: 50, right: 15, top: 6, bottom: 18 };
+  const stripInnerW = stripW - stripMargin.left - stripMargin.right;
+  const stripInnerH = stripH - stripMargin.top - stripMargin.bottom;
+  const arrowLen = stripInnerH * 0.42;
 
-  // Phasor wheel dimensions
+  $: stripXScale = (x) => stripMargin.left + (x / q) * stripInnerW;
+  $: stripCy = stripMargin.top + stripInnerH / 2;
+
+  // Evaluate character continuously at x ∈ [0, q]
+  // For the primary (cyclic) case: chi_k(x) = exp(2πi * freq * x / order)
+  // General: product over generators
+  function evalContinuous(charIdx, x) {
+    const freqs = contData.charFreqs[charIdx];
+    if (!freqs) return [1, 0];
+    // Map x to the discrete-log space for each generator
+    // For a single generator g of order ord, the residue g^j has dlog j.
+    // Continuously, we treat x as the "residue" and compute:
+    //   chi(x) = product_i exp(2*pi*i * freqs[i] * x / q)
+    // This is the natural extension: the character evaluated on the continuous
+    // circle R/qZ, where integer coprime residues are the sample points.
+    let re = 1, im = 0;
+    for (let i = 0; i < freqs.length; i++) {
+      const angle = 2 * Math.PI * freqs[i] * x / contData.orders[i];
+      const c = Math.cos(angle), s = Math.sin(angle);
+      const nre = re * c - im * s;
+      const nim = re * s + im * c;
+      re = nre;
+      im = nim;
+    }
+    return [re, im];
+  }
+
+  // Generate the phasor trail path for a character strip
+  // This traces the tip of the phasor arrow as x varies
+  function phasorTrailPath(charIdx) {
+    const numSamples = 200;
+    const points = [];
+    for (let i = 0; i <= numSamples; i++) {
+      const x = (i / numSamples) * q;
+      const [re, im] = evalContinuous(charIdx, x);
+      const px = stripXScale(x);
+      const py = stripCy - im * arrowLen; // project: y = -Im (up is positive)
+      points.push({ px, py, re, im });
+    }
+    return points;
+  }
+
+  // Number of phasor arrows to draw along the strip
+  const numArrows = 40;
+
+  // Discrete sample points: coprime residues 1..q-1
+  $: discretePoints = residues.map(r => {
+    return characters.map((chi, idx) => {
+      const val = chi.values.get(r) || [0, 0];
+      return { r, re: val[0], im: val[1], prime: isPrime(r) && r > 1 };
+    });
+  });
+
+  // ─── Animation for the phasor wheels (keep from before) ───────
   const phasorSize = 160;
   const phasorCx = phasorSize / 2;
   const phasorCy = phasorSize / 2;
   const phasorR = phasorSize / 2 - 20;
 
-  // Animation state
   let animN = 1;
   let playing = false;
   let animFrame;
@@ -196,7 +118,6 @@
     if (animFrame) cancelAnimationFrame(animFrame);
   });
 
-  // Current phasor values at animN
   $: currentPhasors = characters.map((chi, idx) => {
     const val = chi.values.get(((animN % q) + q) % q) || [0, 0];
     return { chi, re: val[0], im: val[1], color: charColors[idx % charColors.length], index: idx };
@@ -237,33 +158,19 @@
                 {@const prevVal = phasor.chi.values.get(((prevN % q) + q) % q) || [0, 0]}
                 {#if gcd(prevN, q) === 1}
                   <circle
-                    cx={phasorCx + prevVal[0] * phasorR}
-                    cy={phasorCy - prevVal[1] * phasorR}
-                    r="3"
-                    fill={phasor.color}
-                    opacity={0.15 + 0.08 * (8 - k)}
+                    cx={phasorCx + prevVal[0] * phasorR} cy={phasorCy - prevVal[1] * phasorR}
+                    r="3" fill={phasor.color} opacity={0.15 + 0.08 * (8 - k)}
                   />
                 {/if}
               {/if}
             {/each}
 
             {#if gcd(animN, q) === 1}
-              <line
-                x1={phasorCx} y1={phasorCy}
-                x2={phasorCx + phasor.re * phasorR}
-                y2={phasorCy - phasor.im * phasorR}
-                stroke={phasor.color}
-                stroke-width="2.5"
-                stroke-linecap="round"
-              />
-              <circle
-                cx={phasorCx + phasor.re * phasorR}
-                cy={phasorCy - phasor.im * phasorR}
-                r="5"
-                fill={phasor.color}
-                stroke="white"
-                stroke-width="1.5"
-              />
+              <line x1={phasorCx} y1={phasorCy}
+                x2={phasorCx + phasor.re * phasorR} y2={phasorCy - phasor.im * phasorR}
+                stroke={phasor.color} stroke-width="2.5" stroke-linecap="round" />
+              <circle cx={phasorCx + phasor.re * phasorR} cy={phasorCy - phasor.im * phasorR}
+                r="5" fill={phasor.color} stroke="white" stroke-width="1.5" />
             {:else}
               <circle cx={phasorCx} cy={phasorCy} r="4" fill="var(--color-border)" stroke="white" stroke-width="1" />
             {/if}
@@ -274,104 +181,116 @@
     </div>
   </div>
 
-  <!-- Continuous sinusoidal waveform plots -->
+  <!-- Phasor sweep strips -->
   <div class="waveform-section">
-    <h4>Continuous character waveforms</h4>
+    <h4>Phasor sweep — χ(x) as x varies continuously from 0 to {q}</h4>
     <p class="wave-note">
-      Each character is a complex exponential sampled at the coprime integers — just like a
-      Fourier harmonic. The smooth curve is the exact trigonometric interpolation through the
-      sample points; the dots mark the integer values.
-      <span class="prime-note">Gold dots = primes.</span>
+      Each character is <em>e</em><sup>2πi·a·x/{q}</sup> for some frequency <em>a</em>.
+      The arrows show the complex value (phasor) at each point along the x-axis.
+      At coprime integer residues (tick marks), the arrow hits the exact character value.
+      <span class="prime-note">Gold = prime.</span>
     </p>
 
-    {#each waveforms as waveform, idx}
-      <div class="waveform-row">
-        <svg viewBox="0 0 {waveW} {waveH}" preserveAspectRatio="xMidYMid meet" class="waveform-svg">
-          <!-- Gridlines -->
-          <line x1={waveMargin.left} y1={yScale(0)} x2={waveW - waveMargin.right} y2={yScale(0)} stroke="var(--color-border-light)" stroke-width="0.5" />
-          <line x1={waveMargin.left} y1={yScale(1)} x2={waveW - waveMargin.right} y2={yScale(1)} stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="3,3" />
-          <line x1={waveMargin.left} y1={yScale(-1)} x2={waveW - waveMargin.right} y2={yScale(-1)} stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="3,3" />
+    {#each characters as chi, idx}
+      {@const trail = phasorTrailPath(idx)}
+      {@const color = charColors[idx % charColors.length]}
+      <div class="strip-row">
+        <svg viewBox="0 0 {stripW} {stripH}" preserveAspectRatio="xMidYMid meet" class="strip-svg">
+          <!-- Center line (real axis) -->
+          <line x1={stripMargin.left} y1={stripCy} x2={stripW - stripMargin.right} y2={stripCy}
+            stroke="var(--color-border-light)" stroke-width="0.5" />
+          <!-- +1/-1 guides -->
+          <line x1={stripMargin.left} y1={stripCy - arrowLen} x2={stripW - stripMargin.right} y2={stripCy - arrowLen}
+            stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="2,3" />
+          <line x1={stripMargin.left} y1={stripCy + arrowLen} x2={stripW - stripMargin.right} y2={stripCy + arrowLen}
+            stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="2,3" />
 
-          <text x={waveMargin.left - 4} y={yScale(1)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">1</text>
-          <text x={waveMargin.left - 4} y={yScale(-1)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">-1</text>
-          <text x={waveMargin.left - 4} y={yScale(0)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">0</text>
-
-          <text x={8} y={waveH / 2} dominant-baseline="central" font-size="12" font-family="var(--font-mono)" font-weight="600"
-            fill={charColors[idx % charColors.length]}>
-            {waveform.chi.label}
+          <!-- Character label -->
+          <text x={8} y={stripCy} dominant-baseline="central" font-size="12"
+            font-family="var(--font-mono)" font-weight="600" fill={color}>
+            {chi.label}
           </text>
 
-          <!-- Continuous sinusoidal curve (Re part) -->
+          <!-- Im trace (tip path) -->
           <path
-            d={continuousSinePath(idx, 're')}
-            fill="none"
-            stroke={charColors[idx % charColors.length]}
-            stroke-width="1.5"
-            opacity="0.5"
+            d={trail.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.px},${p.py}`).join(' ')}
+            fill="none" stroke={color} stroke-width="1.2" opacity="0.35"
           />
 
-          <!-- Continuous sinusoidal curve (Im part, if complex) -->
-          {#if waveform.points.some(p => p.coprime && Math.abs(p.im) > 0.01)}
-            <path
-              d={continuousSinePath(idx, 'im')}
-              fill="none"
-              stroke={charColors[idx % charColors.length]}
-              stroke-width="1"
-              stroke-dasharray="5,3"
-              opacity="0.3"
-            />
-          {/if}
+          <!-- Re trace -->
+          <path
+            d={trail.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.px},${stripCy - p.re * arrowLen}`).join(' ')}
+            fill="none" stroke={color} stroke-width="1.2" opacity="0.2" stroke-dasharray="3,2"
+          />
 
-          <!-- Stem lines from zero to each coprime integer value -->
-          {#each waveform.points as p}
-            {#if p.coprime}
-              <line
-                x1={xScale(p.n)} y1={yScale(0)}
-                x2={xScale(p.n)} y2={yScale(p.re)}
-                stroke={charColors[idx % charColors.length]}
-                stroke-width="0.7"
-                opacity="0.25"
-              />
-            {/if}
-          {/each}
-
-          <!-- Sample dots at each coprime n -->
-          {#each waveform.points as p}
-            {#if p.coprime}
-              <circle
-                cx={xScale(p.n)}
-                cy={yScale(p.re)}
-                r={p.prime ? 4 : 2.5}
-                fill={p.prime ? 'var(--color-prime)' : charColors[idx % charColors.length]}
-                stroke={p.prime ? 'var(--color-prime)' : 'white'}
-                stroke-width={p.prime ? 0 : 0.75}
-              />
-            {/if}
-          {/each}
-
-          <!-- Current n marker -->
-          {#if animN >= 1 && animN <= maxN}
+          <!-- Phasor arrows at evenly spaced x values -->
+          {#each Array(numArrows) as _, i}
+            {@const x = (i / numArrows) * q}
+            {@const val = evalContinuous(idx, x)}
             <line
-              x1={xScale(animN)} y1={waveMargin.top}
-              x2={xScale(animN)} y2={waveH - waveMargin.bottom}
-              stroke="var(--color-text)" stroke-width="0.75" opacity="0.25"
+              x1={stripXScale(x)} y1={stripCy}
+              x2={stripXScale(x)} y2={stripCy - val[1] * arrowLen}
+              stroke={color} stroke-width="1" opacity="0.15"
             />
-          {/if}
+            <line
+              x1={stripXScale(x)} y1={stripCy}
+              x2={stripXScale(x) + val[0] * 3} y2={stripCy - val[1] * arrowLen}
+              stroke={color} stroke-width="0.5" opacity="0.1"
+            />
+          {/each}
 
-          <!-- X-axis ticks -->
-          {#each waveform.points.filter(p => p.n % 10 === 0 || p.n === 1) as p}
-            <text x={xScale(p.n)} y={waveH - 4} text-anchor="middle" font-size="7" font-family="var(--font-mono)" fill="var(--color-text-light)">
-              {p.n}
+          <!-- Discrete coprime residue markers (the actual character values) -->
+          {#each residues as r, ri}
+            {@const val = chi.values.get(r) || [0, 0]}
+            {@const px = stripXScale(r)}
+            {@const isPrm = isPrime(r) && r > 1}
+            <!-- Phasor arrow at this residue -->
+            <line
+              x1={px} y1={stripCy}
+              x2={px + val[0] * arrowLen * 0.6} y2={stripCy - val[1] * arrowLen * 0.6}
+              stroke={isPrm ? 'var(--color-prime)' : color}
+              stroke-width="2"
+              stroke-linecap="round"
+              opacity="0.9"
+            />
+            <!-- Arrowhead dot -->
+            <circle
+              cx={px + val[0] * arrowLen * 0.6}
+              cy={stripCy - val[1] * arrowLen * 0.6}
+              r={isPrm ? 3.5 : 2.5}
+              fill={isPrm ? 'var(--color-prime)' : color}
+              stroke="white" stroke-width="0.75"
+            />
+            <!-- Tick mark on the axis -->
+            <line x1={px} y1={stripCy + arrowLen + 2} x2={px} y2={stripCy + arrowLen + 7}
+              stroke="var(--color-text-muted)" stroke-width="0.75" />
+            <text x={px} y={stripH - 2} text-anchor="middle"
+              font-size="7" font-family="var(--font-mono)"
+              fill={isPrm ? 'var(--color-prime)' : 'var(--color-text-light)'}
+              font-weight={isPrm ? '600' : '400'}>
+              {r}
             </text>
+          {/each}
+
+          <!-- Mark non-coprime integers with small x's -->
+          {#each Array(q) as _, n}
+            {#if n > 0 && gcd(n, q) !== 1}
+              <line x1={stripXScale(n)} y1={stripCy + arrowLen + 2} x2={stripXScale(n)} y2={stripCy + arrowLen + 5}
+                stroke="var(--color-border)" stroke-width="0.5" />
+              <text x={stripXScale(n)} y={stripH - 2} text-anchor="middle"
+                font-size="6" font-family="var(--font-mono)" fill="var(--color-border)" opacity="0.5">
+                {n}
+              </text>
+            {/if}
           {/each}
         </svg>
       </div>
     {/each}
 
     <div class="wave-legend">
-      <span class="legend-item"><span class="legend-line solid"></span> Re(χ) continuous</span>
-      <span class="legend-item"><span class="legend-line dashed"></span> Im(χ) continuous</span>
-      <span class="legend-item"><span class="legend-dot sample"></span> Integer sample</span>
+      <span class="legend-item"><span class="legend-line solid"></span> Im(χ) trace</span>
+      <span class="legend-item"><span class="legend-line dashed"></span> Re(χ) trace</span>
+      <span class="legend-item"><span class="legend-arrow"></span> Phasor at coprime residue</span>
       <span class="legend-item"><span class="legend-dot prime"></span> Prime</span>
     </div>
   </div>
@@ -394,15 +313,16 @@
   .waveform-section h4 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); margin-bottom: 0.3em; }
   .wave-note { font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 0.8em; }
   .prime-note { color: var(--color-prime); font-weight: 500; }
-  .waveform-row { margin-bottom: -0.3em; }
-  .waveform-svg { width: 100%; height: auto; }
+  .strip-row { margin-bottom: -0.2em; }
+  .strip-svg { width: 100%; height: auto; }
   .wave-legend { display: flex; gap: 1.2em; justify-content: center; margin-top: 0.5em; font-size: 0.75rem; color: var(--color-text-muted); flex-wrap: wrap; }
   .legend-item { display: flex; align-items: center; gap: 0.3em; }
   .legend-line { width: 18px; height: 2px; border-radius: 1px; }
-  .legend-line.solid { background: var(--color-char-0); opacity: 0.6; }
-  .legend-line.dashed { background: repeating-linear-gradient(90deg, var(--color-char-0) 0 5px, transparent 5px 8px); opacity: 0.4; }
+  .legend-line.solid { background: var(--color-char-0); opacity: 0.4; }
+  .legend-line.dashed { background: repeating-linear-gradient(90deg, var(--color-char-0) 0 3px, transparent 3px 5px); opacity: 0.3; }
+  .legend-arrow { width: 14px; height: 2px; background: var(--color-char-0); border-radius: 1px; position: relative; }
+  .legend-arrow::after { content: ''; position: absolute; right: -2px; top: -2px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-char-0); }
   .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
-  .legend-dot.sample { background: var(--color-char-0); }
   .legend-dot.prime { background: var(--color-prime); }
   circle, line { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
 </style>
