@@ -32,7 +32,14 @@
     value: Math.pow(i + 1, -sValue)
   }));
 
-  $: sSum = zetaPartial(sValue, 1000).toFixed(4);
+  $: sSumRaw = zetaPartial(sValue, 5000);
+  $: sSum = sValue <= 1.0
+    ? '∞'
+    : sSumRaw > 1000
+      ? sSumRaw.toFixed(0)
+      : sSumRaw > 100
+        ? sSumRaw.toFixed(1)
+        : sSumRaw.toFixed(4);
 </script>
 
 <Section id="lfunctions" title="The Prime-Counting Machine" subtitle="L-functions: the tool that connects sums over numbers to products over primes.">
@@ -70,16 +77,17 @@
 
   <p>What if instead of <Tex tex="1/n" />, we use <Tex tex="1/n^s" /> for some number <Tex tex="s" />?
   When <Tex tex="s" /> is large, the terms shrink fast and the sum converges (settles down to a finite value).
-  When <Tex tex="s" /> is close to 1, the terms shrink slowly and the sum explodes.</p>
+  When <Tex tex="s" /> is close to 1, the terms shrink slowly and the sum grows huge.
+  At <Tex tex="s = 1" /> and below, the sum diverges — it heads to infinity.</p>
 
   <div class="viz-container">
     <h4>The s-dial — turn it to control convergence</h4>
-    <Slider label="s" bind:value={sValue} min={1.01} max={4} step={0.01} format={v => v.toFixed(2)} />
+    <Slider label="s" bind:value={sValue} min={0.5} max={4} step={0.01} format={v => v.toFixed(2)} />
 
     <div class="bar-chart">
       {#each sBars as bar}
         <div class="bar-col">
-          <div class="bar s-bar" style="height: {bar.value * 150}px"></div>
+          <div class="bar s-bar" style="height: {Math.min(bar.value * 150, 160)}px"></div>
           <span class="bar-n">{bar.n}</span>
         </div>
       {/each}
@@ -87,8 +95,10 @@
 
     <p class="sum-display">
       <Tex tex={`\\sum 1/n^{${sValue === Math.round(sValue) ? sValue : sValue.toFixed(2)}}`} /> ≈ <strong>{sSum}</strong>
-      {#if sValue < 1.1}
-        <span class="note explosion">Exploding!</span>
+      {#if sValue <= 1.0}
+        <span class="note explosion">Diverges! (s ≤ 1)</span>
+      {:else if sValue < 1.1}
+        <span class="note explosion">Enormous — approaching the pole</span>
       {:else if sValue < 1.5}
         <span class="note">Large but finite</span>
       {:else}
@@ -98,7 +108,9 @@
   </div>
 
   <p>The function <Tex tex="\zeta(s) = \sum_n 1/n^s" /> is called the <strong>Riemann zeta function</strong>.
-  It has a "pole" (explosion) at <Tex tex="s = 1" />, where the harmonic series diverges.</p>
+  It has a "pole" (explosion) at <Tex tex="s = 1" />: the sum diverges for <Tex tex="s \le 1" />
+  and converges for <Tex tex="s > 1" />. The closer <Tex tex="s" /> gets to 1 from above, the larger
+  the sum becomes.</p>
 
   <h3>Euler's miracle: sums equal products</h3>
 
