@@ -187,7 +187,13 @@
   <p>The crucial difference: for the <strong>principal character</strong> <Tex tex="\chi_0" />
   (which assigns 1 to everything coprime to <Tex tex="q" />), the L-function is essentially
   the zeta function — it <em>blows up</em> at <Tex tex="s = 1" />.
-  For all other characters, the L-function stays <strong>finite</strong> at <Tex tex="s = 1" />.</p>
+  (Why? Because <Tex tex="\chi_0(n) = 1" /> for coprime <Tex tex="n" />, so the sum is nearly the
+  same as <Tex tex="\zeta(s)" />, just missing the few terms where <Tex tex="n" /> shares a factor with <Tex tex="q" />.
+  Removing finitely many factors from the Euler product doesn't prevent the divergence.)</p>
+
+  <p>For non-principal characters, the sum <Tex tex={String.raw`\sum \chi(n)/n^s`} /> doesn't diverge at <Tex tex="s = 1" />.
+  Intuitively, this is because the arrows <Tex tex="\chi(n)" /> point in different directions and partially cancel,
+  preventing the sum from blowing up. (The character values within each period sum to zero, creating cancellation.)</p>
 
   <div class="viz-container">
     <h4>L-functions for all characters mod {plotQ}</h4>
@@ -196,13 +202,40 @@
     <LFunctionPlot q={plotQ} sValue={plotS} />
   </div>
 
+  <h3>From L-functions to counting primes</h3>
+
+  <p>Now we connect everything. The Euler product lets us take logarithms, and the character
+  filter lets us isolate one residue class. Here's the derivation in three steps:</p>
+
+  <p><strong>Step 1: Take the log of the Euler product.</strong>
+  Since <Tex tex={String.raw`L(s,\chi) = \prod_p \frac{1}{1-\chi(p)/p^s}`} />, taking logs turns the product into a sum:</p>
+
+  <Tex display tex={String.raw`\log L(s, \chi) = \sum_{p} \sum_{k=1}^{\infty} \frac{\chi(p)^k}{k \, p^{ks}} \approx \sum_{p} \frac{\chi(p)}{p^s}`} />
+
+  <p>(The <Tex tex="k \ge 2" /> terms are small and stay bounded — only the <Tex tex="k=1" /> terms matter.)</p>
+
+  <p><strong>Step 2: Apply the character filter.</strong>
+  Multiply both sides by <Tex tex={String.raw`\overline{\chi(a)} / \varphi(q)`} /> and sum over all characters <Tex tex="\chi" />:</p>
+
+  <Tex display tex={String.raw`\frac{1}{\varphi(q)} \sum_{\chi} \overline{\chi(a)} \log L(s,\chi) \approx \frac{1}{\varphi(q)} \sum_{\chi} \overline{\chi(a)} \sum_{p} \frac{\chi(p)}{p^s}`} />
+
+  <p><strong>Step 3: Swap the sums and use orthogonality.</strong>
+  On the right side, for each prime <Tex tex="p" />, the inner sum
+  <Tex tex={String.raw`\sum_{\chi} \overline{\chi(a)}\chi(p) / \varphi(q)`} /> is exactly the
+  extraction formula from the characters section — it equals 1 when
+  <Tex tex={String.raw`p \equiv a \pmod{q}`} /> and 0 otherwise. So:</p>
+
+  <Tex display tex={String.raw`\frac{1}{\varphi(q)} \sum_{\chi} \overline{\chi(a)} \log L(s,\chi) \approx \sum_{\substack{p \equiv a \pmod{q}}} \frac{1}{p^s}`} />
+
   <Callout type="insight">
-    <p><strong>The key formula:</strong> Using the character filter from the last section:</p>
-    <Tex display tex={String.raw`\sum_{\substack{p \equiv a \pmod{q}}} \frac{1}{p^s} = \frac{1}{\varphi(q)} \sum_\chi \overline{\chi(a)} \log L(s, \chi) + O(1)`} />
-    <p>As <Tex tex="s \to 1" />, the principal term <Tex tex="\log L(s, \chi_0)" /> diverges (heads to infinity).
-    The other terms stay bounded <strong>as long as <Tex tex="L(1, \chi) \neq 0" /></strong>.
-    So the whole sum diverges — meaning infinitely many primes in every coprime column!</p>
-    <p>Everything hinges on one question: can <Tex tex="L(1, \chi)" /> ever be zero?</p>
+    <p><strong>The key formula:</strong> The sum of <Tex tex={String.raw`1/p^s`} /> over primes in one column
+    equals a weighted combination of <Tex tex={String.raw`\log L(s, \chi)`} /> over all characters.
+    As <Tex tex="s \to 1" />, the principal term <Tex tex={String.raw`\log L(s, \chi_0)`} /> diverges
+    (because <Tex tex={String.raw`L(s,\chi_0)`} /> has a pole). The other terms stay bounded
+    <strong>as long as <Tex tex={String.raw`L(1, \chi) \neq 0`} /></strong> — because
+    <Tex tex={String.raw`\log L(s,\chi)`} /> stays finite when <Tex tex={String.raw`L(1,\chi)`} /> is a nonzero finite number.
+    So the whole sum diverges — meaning <strong>infinitely many primes</strong> in every coprime column!</p>
+    <p>Everything hinges on one question: can <Tex tex={String.raw`L(1, \chi)`} /> ever be zero?</p>
   </Callout>
 
 </Section>

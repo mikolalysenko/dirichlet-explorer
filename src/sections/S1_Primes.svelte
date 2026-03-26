@@ -55,6 +55,14 @@
     <FactorTree startNumber={treeNumber} />
   </div>
 
+  <Callout type="insight">
+    <p><strong>The Fundamental Theorem of Arithmetic:</strong> Every whole number greater than 1
+    can be written as a product of primes in <em>exactly one way</em> (ignoring order).
+    For example, 60 = 2 × 2 × 3 × 5 — and there is no other way to factor it.
+    This uniqueness is the foundation for everything that follows. It's the reason the
+    Euler product works (Section 5), and it's why primes truly are the "atoms" of numbers.</p>
+  </Callout>
+
   <h3>Are there infinitely many primes?</h3>
 
   <p>Yes! This was proven over 2,000 years ago by the Greek mathematician <strong>Euclid</strong>.

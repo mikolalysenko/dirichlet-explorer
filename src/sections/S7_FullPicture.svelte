@@ -50,9 +50,16 @@
 
   <h3>The equidistribution bonus</h3>
 
-  <p>The proof gives us something extra: since the divergent part comes equally from
-  the principal character (which doesn't depend on <Tex tex="a" />), the primes are
-  <strong>equally distributed</strong> among all <Tex tex="\varphi(q)" /> coprime residue classes.</p>
+  <p>The proof gives us something extra. The key formula says:</p>
+
+  <Tex display tex={String.raw`\sum_{\substack{p \equiv a \pmod{q}}} \frac{1}{p^s} = \frac{1}{\varphi(q)} \log\frac{1}{s-1} + \text{bounded terms}`} />
+
+  <p>The divergent part — <Tex tex={String.raw`\frac{1}{\varphi(q)} \log \frac{1}{s-1}`} /> — is the <strong>same</strong>
+  for every coprime residue <Tex tex="a" />, because it comes entirely from the principal character
+  <Tex tex="\chi_0" />, which doesn't depend on <Tex tex="a" />. The non-principal characters contribute
+  bounded terms that become negligible compared to the divergence. So in the limit, each residue
+  class gets exactly <Tex tex={String.raw`1/\varphi(q)`} /> of the total "prime weight" — the primes are
+  <strong>equally distributed</strong> among all <Tex tex={String.raw`\varphi(q)`} /> coprime residue classes.</p>
 
   <p>Watch the histogram below as you increase the range — the bars become more and more equal!</p>
 

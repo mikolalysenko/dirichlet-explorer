@@ -53,6 +53,14 @@
   Something magical happens with the coprime positions: when you multiply two coprime positions,
   you <em>always</em> land on another coprime position!</p>
 
+  <p><strong>Why?</strong> Suppose <Tex tex="a" /> and <Tex tex="b" /> both share no factor with <Tex tex="q" />.
+  Could their product <Tex tex="a \cdot b" /> share a factor with <Tex tex="q" />?
+  If some prime <Tex tex="p" /> divided both <Tex tex="a \cdot b" /> and <Tex tex="q" />,
+  then <Tex tex="p" /> would have to divide <Tex tex="a" /> or <Tex tex="b" />
+  (that's what primes do — they can't divide a product without dividing at least one factor).
+  But that contradicts <Tex tex="a" /> and <Tex tex="b" /> being coprime to <Tex tex="q" />.
+  So <Tex tex="a \cdot b" /> must be coprime to <Tex tex="q" /> too.</p>
+
   <div class="viz-container">
     <h4>Multiply on the clock</h4>
 
@@ -82,7 +90,11 @@
 
   <Callout type="insight">
     <p><strong>Key insight:</strong> The coprime remainders modulo <Tex tex="q" /> form a
-    <em>closed system</em> under multiplication. Mathematicians call this a <strong>group</strong>.
+    <strong>group</strong> under multiplication. This means they have four nice properties:
+    (1) multiplying two coprime remainders gives another coprime remainder (closure),
+    (2) the number 1 acts as an identity (<Tex tex="1 \cdot a = a" />),
+    (3) every element has an inverse (some <Tex tex="b" /> where <Tex tex="a \cdot b \equiv 1" /> mod <Tex tex="q" />),
+    and (4) multiplication is associative.
     This group structure is exactly what Dirichlet used to build his prime-detecting tool.</p>
   </Callout>
 

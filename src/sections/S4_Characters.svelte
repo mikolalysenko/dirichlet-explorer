@@ -22,14 +22,37 @@
   <p>Imagine that every column in our number grid is a different radio station, all
   broadcasting at once. You hear a jumble of noise. How do you tune into just one station?</p>
 
-  <p>Dirichlet's brilliant invention was a set of special functions called <strong>characters</strong>.
-  Each character assigns a "label" (a number on the unit circle in the complex plane)
-  to every coprime residue. The labels obey a crucial rule:</p>
+  <p>Dirichlet's answer required a new idea: using <strong>arrows</strong> instead of ordinary numbers.</p>
+
+  <h3>A quick detour: arrows on a circle</h3>
+
+  <p>You know numbers on a number line. But we can also represent a number as an <strong>arrow</strong>
+  from the center of a circle — with a <em>direction</em> (angle) and a <em>length</em>.</p>
+
+  <p>On the <strong>unit circle</strong> (radius 1), every arrow has length 1 — only the direction matters.
+  An arrow at 0° points right — this represents the number <strong>1</strong>.
+  An arrow at 180° points left — this is <strong>−1</strong>.
+  An arrow at 90° points up, and 270° points down.</p>
+
+  <p>Here's the key: <strong>you multiply arrows by adding their angles.</strong>
+  An arrow at 90° times an arrow at 90° gives an arrow at 180° (that's <em>i</em> × <em>i</em> = −1).
+  An arrow at 120° times itself three times goes 120° + 120° + 120° = 360° = back to the start (the number 1).</p>
+
+  <p>Mathematicians call these arrows <strong>complex numbers on the unit circle</strong>, and write
+  them as <Tex tex={String.raw`e^{i\theta}`} /> where <Tex tex={String.raw`\theta`} /> is the angle.
+  But you can just think of them as <em>arrows that you multiply by adding angles</em>.
+  This simple idea is the foundation of Fourier analysis, signal processing, and — as we'll see — Dirichlet's proof.</p>
+
+  <h3>Characters: labeling residues with arrows</h3>
+
+  <p>Dirichlet's invention was a set of special functions called <strong>characters</strong>.
+  Each character assigns an <em>arrow</em> (a point on the unit circle)
+  to every coprime residue. The arrows obey a crucial rule:</p>
 
   <Tex display tex="\chi(a \cdot b) = \chi(a) \cdot \chi(b)" />
 
-  <p>The character of a product equals the product of the characters. This <em>multiplicativity</em>
-  is what connects characters to primes (since primes are all about multiplication).</p>
+  <p>The character of a product equals the product of the characters — that is, the <em>angles add</em>.
+  This <em>multiplicativity</em> is what connects characters to primes (since primes are all about multiplication).</p>
 
   <div class="viz-container">
     <h4>Character table for mod {q}</h4>

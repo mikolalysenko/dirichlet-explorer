@@ -75,12 +75,18 @@
 
   <Tex display tex="\prod_\chi L(s, \chi)" />
 
-  <p>This product has a remarkable property: when you expand it as a sum <Tex tex="\sum a_n / n^s" />,
-  all the coefficients <Tex tex="a_n" /> are <strong>non-negative</strong>. Why? Because the orthogonality
-  of characters means this product only "counts" prime powers that are
-  <Tex tex={String.raw`\equiv 1 \pmod{q}`} /> — and counting is always non-negative!</p>
+  <p>This product has a remarkable property: when you take its logarithm using the Euler product, you get:</p>
 
-  <p>Since all coefficients are non-negative and the first coefficient is 1, the product is
+  <Tex display tex={String.raw`\log \prod_\chi L(s,\chi) = \sum_p \sum_{k \ge 1} \frac{1}{k \, p^{ks}} \sum_\chi \chi(p^k)`} />
+
+  <p>By the orthogonality of characters, the inner sum <Tex tex={String.raw`\sum_\chi \chi(p^k)`} /> equals
+  <Tex tex={String.raw`\varphi(q)`} /> when <Tex tex={String.raw`p^k \equiv 1 \pmod{q}`} />, and 0 otherwise.
+  So the log is a sum of <strong>non-negative</strong> terms — it's counting (with weights) prime
+  powers that are congruent to 1 mod <Tex tex="q" />. Since the log is non-negative,
+  the product itself is <Tex tex={String.raw`\ge e^0 = 1`} />.</p>
+
+  <p>In other words: all the "coefficients" in the Dirichlet series expansion of this product
+  are non-negative, the first coefficient is 1, so the product is
   <strong>always at least 1</strong> for real <Tex tex="s > 1" />.</p>
 
   <div class="viz-container">
@@ -148,8 +154,11 @@
     </div>
   </div>
 
-  <p>Two zeros beat one pole: the product would be forced to zero or negative near <Tex tex="s = 1" />.
-  But we proved the product is <strong>always &ge; 1</strong>. Contradiction!</p>
+  <p>Near <Tex tex="s = 1" />, the pole from <Tex tex="\chi_0" /> makes its factor behave
+  like <Tex tex={String.raw`\frac{1}{s-1}`} />, while each zero contributes a factor of <Tex tex="(s-1)" />.
+  The product would behave like <Tex tex={String.raw`\frac{(s-1)^2}{s-1} = (s-1) \to 0`} /> as <Tex tex="s \to 1" />.
+  But we proved the product is <strong>always &ge; 1</strong>. A quantity that's always &ge; 1 can't approach 0.
+  <strong>Contradiction!</strong></p>
 
   <Callout type="insight">
     <p><strong>For complex characters:</strong> <Tex tex="L(1, \chi) \neq 0" /> because a zero
@@ -163,20 +172,29 @@
   so a zero would only count once — exactly matching the one pole.
   The product argument alone isn't enough!</p>
 
-  <p>Dirichlet needed a subtler idea. Consider just <Tex tex="\zeta(s) \cdot L(s, \chi)" />
-  for a real character <Tex tex="\chi" />. This product also has non-negative coefficients.
-  If <Tex tex="L(1, \chi) = 0" />, the zero would cancel the pole from <Tex tex="\zeta" />,
-  making the product analytic (well-behaved) everywhere for <Tex tex="s > 0" />.</p>
+  <p>Dirichlet needed a subtler idea. Consider just <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} />
+  for a real character <Tex tex="\chi" />. This product also has non-negative coefficients
+  (because for a real character, each prime contributes either <Tex tex={String.raw`(1-p^{-s})^{-2}`} /> if
+  <Tex tex={String.raw`\chi(p)=1`} />, or <Tex tex={String.raw`(1-p^{-2s})^{-1}`} /> if
+  <Tex tex={String.raw`\chi(p)=-1`} /> — both have non-negative series expansions).</p>
 
-  <p>But here's the catch: the non-negative coefficients include terms like
-  <Tex tex={String.raw`1/m^{2s}`} /> for every integer <Tex tex="m" /> coprime to <Tex tex="q" />.
-  As <Tex tex="s \to 1/2" />, these terms alone diverge to infinity.
-  A well-behaved function can't diverge — <strong>contradiction</strong>!</p>
+  <p>If <Tex tex="L(1, \chi) = 0" />, the zero would cancel the pole from <Tex tex="\zeta" />,
+  making the product analytic (well-behaved with no singularities) for all <Tex tex="s > 0" />.
+  There is a theorem called <strong>Landau's theorem</strong> that says: a Dirichlet series with
+  non-negative coefficients must have a singularity at the boundary of its region of convergence.
+  If the product is analytic for all <Tex tex="s > 0" />, then the series would have to converge for
+  all <Tex tex="s > 0" />.</p>
+
+  <p>But the non-negative coefficients include terms <Tex tex={String.raw`1/m^{2s}`} /> for every
+  integer <Tex tex="m" /> coprime to <Tex tex="q" />.
+  As <Tex tex={String.raw`s \to 1/2`} />, the sum <Tex tex={String.raw`\sum 1/m^{2s} \to \sum 1/m = \infty`} />.
+  A convergent series can't sum to infinity — <strong>contradiction</strong>!</p>
 
   <Callout>
     <p><strong>In short:</strong> If <Tex tex="L(1, \chi) = 0" /> for a real character, then
-    <Tex tex="\zeta(s) L(s, \chi)" /> would have to be both "well-behaved" (analytic)
-    and "explosive" (divergent) at <Tex tex="s = 1/2" />. That's impossible.
+    <Tex tex={String.raw`\zeta(s) L(s, \chi)`} /> would be analytic everywhere for <Tex tex="s > 0" />
+    (Landau's theorem would force convergence there), but the series provably diverges
+    at <Tex tex="s = 1/2" />. That's a contradiction.
     So <Tex tex="L(1, \chi) \neq 0" /> for real characters too.</p>
   </Callout>
 

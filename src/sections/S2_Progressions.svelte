@@ -70,6 +70,15 @@
   shares <strong>no common factor</strong> with <Tex tex="q" />. Mathematicians say these numbers
   are <strong>coprime</strong> to <Tex tex="q" />.</p>
 
+  <Callout>
+    <p><strong>Why some columns can never have primes:</strong> If a column's remainder shares a
+    factor <Tex tex="d > 1" /> with <Tex tex="q" />, then <em>every</em> number in that column is divisible
+    by <Tex tex="d" />. Why? Because all numbers in the column differ by multiples of <Tex tex="q" />,
+    and <Tex tex="d" /> divides <Tex tex="q" />, so they all have the same remainder when divided
+    by <Tex tex="d" />. A number divisible by <Tex tex="d > 1" /> can only be prime if it equals <Tex tex="d" /> itself.
+    So these columns are essentially prime-free.</p>
+  </Callout>
+
   <p>For <Tex tex="q = {q}" />, the coprime columns are: <strong class="prime-number">{residues.join(', ')}</strong>
   — that's <Tex tex="\varphi({q}) = {phi}" /> columns (we call this <em>Euler's totient function</em>).</p>
 
