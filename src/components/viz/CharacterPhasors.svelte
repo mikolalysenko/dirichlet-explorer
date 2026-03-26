@@ -1,6 +1,6 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
-  import { dirichletCharacters, complexAbs } from '../../lib/characters.js';
+  import { onDestroy } from 'svelte';
+  import { dirichletCharacters, characterContinuousData, evalCharacterContinuous } from '../../lib/characters.js';
   import { coprimeResidues, gcd } from '../../lib/math-utils.js';
   import { isPrime } from '../../lib/primes.js';
 
@@ -9,8 +9,117 @@
 
   $: characters = dirichletCharacters(q);
   $: residues = coprimeResidues(q);
+  $: contData = characterContinuousData(q);
 
-  // Evaluate each character at every integer from 1..maxN
+  // Build the mapping from integer n to the continuous phase parameter.
+  // Each coprime integer increments the phase by 1 in the "discrete log" space.
+  // For the primary generator, the phase at coprime n is dlog(n mod q)[0],
+  // and we accumulate full-period offsets as n wraps around.
+  //
+  // We assign each coprime integer a sequential index (0, 1, 2, ...),
+  // and the continuous sinusoidal curve interpolates between these.
+  $: coprimeSequence = (() => {
+    const seq = [];
+    for (let n = 1; n <= maxN; n++) {
+      if (gcd(n, q) === 1) {
+        const r = ((n % q) + q) % q;
+        const dlogVec = contData.dlog.get(r);
+        seq.push({
+          n,
+          seqIndex: seq.length,
+          dlog: dlogVec || new Array(contData.generators.length).fill(0),
+          prime: isPrime(n)
+        });
+      }
+    }
+    return seq;
+  })();
+
+  // For the continuous sinusoidal waveform:
+  // We parameterize by a continuous variable t that linearly interpolates
+  // between consecutive coprime integers on the x-axis.
+  // At each coprime integer n_k, the "phase" is its discrete log vector.
+  // Between n_k and n_{k+1}, the phase linearly interpolates between
+  // dlog(n_k) and dlog(n_{k+1}), with wrapping for the cyclic structure.
+  //
+  // This means the curve is: chi(t) = exp(2πi * freq · phase(t) / order)
+  // where phase(t) smoothly advances.
+
+  // Precompute unwrapped phase for each coprime integer.
+  // The raw dlog jumps around; we unwrap it so the phase increases monotonically
+  // (advancing by the right amount each step for a smooth sinusoid).
+  $: unwrappedPhases = (() => {
+    if (coprimeSequence.length === 0) return [];
+    const nGens = contData.generators.length;
+    const phases = [];
+
+    // Track cumulative phase per generator
+    const cumPhase = new Array(nGens).fill(0);
+    const prevDlog = new Array(nGens).fill(0);
+
+    for (let k = 0; k < coprimeSequence.length; k++) {
+      const pt = coprimeSequence[k];
+      if (k === 0) {
+        // First point: phase = dlog
+        for (let i = 0; i < nGens; i++) {
+          cumPhase[i] = pt.dlog[i];
+          prevDlog[i] = pt.dlog[i];
+        }
+      } else {
+        for (let i = 0; i < nGens; i++) {
+          // Compute the step in dlog space (mod order)
+          let delta = pt.dlog[i] - prevDlog[i];
+          const ord = contData.orders[i];
+          // Wrap delta to [-ord/2, ord/2] for minimal-distance unwrap
+          while (delta > ord / 2) delta -= ord;
+          while (delta < -ord / 2) delta += ord;
+          cumPhase[i] += delta;
+          prevDlog[i] = pt.dlog[i];
+        }
+      }
+      phases.push([...cumPhase]);
+    }
+    return phases;
+  })();
+
+  // Generate the continuous sinusoidal path for a given character
+  function continuousSinePath(charIndex, part) {
+    const freqs = contData.charFreqs[charIndex];
+    if (!freqs || coprimeSequence.length < 2) return '';
+    const orders = contData.orders;
+    const samplesPerSegment = 12;
+    const points = [];
+
+    for (let k = 0; k < coprimeSequence.length - 1; k++) {
+      const n0 = coprimeSequence[k].n;
+      const n1 = coprimeSequence[k + 1].n;
+      const phase0 = unwrappedPhases[k];
+      const phase1 = unwrappedPhases[k + 1];
+
+      for (let s = 0; s <= samplesPerSegment; s++) {
+        // Skip last sample except on final segment (avoid duplicates)
+        if (s === samplesPerSegment && k < coprimeSequence.length - 2) continue;
+
+        const frac = s / samplesPerSegment;
+        // Linearly interpolate x-position and phase
+        const x = n0 + (n1 - n0) * frac;
+        const t = [];
+        for (let i = 0; i < freqs.length; i++) {
+          t.push(phase0[i] + (phase1[i] - phase0[i]) * frac);
+        }
+        const val = evalCharacterContinuous(freqs, orders, t);
+        const y = part === 're' ? val[0] : val[1];
+        points.push({ x, y });
+      }
+    }
+
+    if (points.length === 0) return '';
+    return points.map((p, i) =>
+      `${i === 0 ? 'M' : 'L'}${xScale(p.x)},${yScale(p.y)}`
+    ).join(' ');
+  }
+
+  // Also evaluate at each coprime integer (for the dot overlay)
   $: waveforms = characters.map((chi, idx) => {
     const points = [];
     for (let n = 1; n <= maxN; n++) {
@@ -27,8 +136,8 @@
 
   // Waveform plot dimensions
   const waveW = 700;
-  const waveH = 100;
-  const waveMargin = { left: 50, right: 15, top: 8, bottom: 20 };
+  const waveH = 110;
+  const waveMargin = { left: 50, right: 15, top: 8, bottom: 22 };
   const waveInner = waveW - waveMargin.left - waveMargin.right;
   const waveInnerH = waveH - waveMargin.top - waveMargin.bottom;
 
@@ -46,7 +155,7 @@
   let playing = false;
   let animFrame;
   let lastTime = 0;
-  const speed = 400; // ms per step
+  const speed = 400;
 
   function tick(time) {
     if (!playing) return;
@@ -74,46 +183,6 @@
     const val = chi.values.get(((animN % q) + q) % q) || [0, 0];
     return { chi, re: val[0], im: val[1], color: charColors[idx % charColors.length], index: idx };
   });
-
-  // Waveform path (Re part) with stems at each integer
-  function wavePath(waveform, part) {
-    const pts = waveform.points.filter(p => p.coprime);
-    if (pts.length === 0) return '';
-    return pts.map((p, i) => {
-      const x = xScale(p.n);
-      const y = yScale(part === 're' ? p.re : p.im);
-      return `${i === 0 ? 'M' : 'L'}${x},${y}`;
-    }).join(' ');
-  }
-
-  // Continuous interpolated path for smoother look
-  function smoothWavePath(waveform, part) {
-    const pts = [];
-    for (let n = 1; n <= maxN; n++) {
-      const val = waveform.chi.values.get(((n % q) + q) % q) || [0, 0];
-      const coprime = gcd(n, q) === 1;
-      if (coprime) {
-        pts.push({ n, v: part === 're' ? val[0] : val[1] });
-      }
-    }
-    if (pts.length === 0) return '';
-    // Draw as step function with smooth transitions
-    let d = '';
-    for (let i = 0; i < pts.length; i++) {
-      const x = xScale(pts[i].n);
-      const y = yScale(pts[i].v);
-      if (i === 0) {
-        d += `M${x},${y}`;
-      } else {
-        // Horizontal step to midpoint, then vertical
-        const prevX = xScale(pts[i - 1].n);
-        const midX = (prevX + x) / 2;
-        const prevY = yScale(pts[i - 1].v);
-        d += ` L${midX},${prevY} L${midX},${y} L${x},${y}`;
-      }
-    }
-    return d;
-  }
 </script>
 
 <div class="phasor-viz">
@@ -146,7 +215,7 @@
             <line x1={phasorCx - phasorR} y1={phasorCy} x2={phasorCx + phasorR} y2={phasorCy} stroke="var(--color-border-light)" stroke-width="0.5" />
             <line x1={phasorCx} y1={phasorCy - phasorR} x2={phasorCx} y2={phasorCy + phasorR} stroke="var(--color-border-light)" stroke-width="0.5" />
 
-            <!-- Trail: show previous values as fading dots -->
+            <!-- Trail: show previous coprime values as fading dots -->
             {#each Array(Math.min(q, 8)) as _, k}
               {@const prevN = animN - k - 1}
               {#if prevN >= 1}
@@ -182,7 +251,6 @@
                 stroke-width="1.5"
               />
             {:else}
-              <!-- Zero: dot at origin -->
               <circle cx={phasorCx} cy={phasorCy} r="4" fill="var(--color-border)" stroke="white" stroke-width="1" />
             {/if}
           </svg>
@@ -192,74 +260,90 @@
     </div>
   </div>
 
-  <!-- Waveform plots -->
+  <!-- Continuous sinusoidal waveform plots -->
   <div class="waveform-section">
-    <h4>Character waveforms — real part of χ(n) as n varies</h4>
-    <p class="wave-note">Each character oscillates at a different "frequency." The principal character χ₀ is constant (flat line at 1 for coprime n). Others oscillate — just like Fourier harmonics.</p>
+    <h4>Continuous character waveforms</h4>
+    <p class="wave-note">
+      Each character is a complex exponential sampled at the coprime integers — just like a
+      Fourier harmonic. The smooth sinusoidal curve shows the underlying continuous wave;
+      the dots mark the actual integer sample points.
+      <span class="prime-note">Gold dots = primes.</span>
+    </p>
 
-    {#each waveforms as waveform}
+    {#each waveforms as waveform, idx}
       <div class="waveform-row">
         <svg viewBox="0 0 {waveW} {waveH}" preserveAspectRatio="xMidYMid meet" class="waveform-svg">
-          <!-- Zero line -->
-          <line
-            x1={waveMargin.left} y1={yScale(0)}
-            x2={waveW - waveMargin.right} y2={yScale(0)}
-            stroke="var(--color-border-light)" stroke-width="0.5"
-          />
-          <!-- +1 / -1 lines -->
+          <!-- Gridlines -->
+          <line x1={waveMargin.left} y1={yScale(0)} x2={waveW - waveMargin.right} y2={yScale(0)} stroke="var(--color-border-light)" stroke-width="0.5" />
           <line x1={waveMargin.left} y1={yScale(1)} x2={waveW - waveMargin.right} y2={yScale(1)} stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="3,3" />
           <line x1={waveMargin.left} y1={yScale(-1)} x2={waveW - waveMargin.right} y2={yScale(-1)} stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="3,3" />
 
           <!-- Y-axis labels -->
           <text x={waveMargin.left - 4} y={yScale(1)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">1</text>
           <text x={waveMargin.left - 4} y={yScale(-1)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">-1</text>
+          <text x={waveMargin.left - 4} y={yScale(0)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">0</text>
 
           <!-- Character label -->
           <text x={8} y={waveH / 2} dominant-baseline="central" font-size="12" font-family="var(--font-mono)" font-weight="600"
-            fill={charColors[waveform.index % charColors.length]}>
+            fill={charColors[idx % charColors.length]}>
             {waveform.chi.label}
           </text>
 
-          <!-- Step-function waveform (Re part) -->
+          <!-- Continuous sinusoidal curve (Re part) -->
           <path
-            d={smoothWavePath(waveform, 're')}
+            d={continuousSinePath(idx, 're')}
             fill="none"
-            stroke={charColors[waveform.index % charColors.length]}
-            stroke-width="1.8"
-            opacity="0.85"
+            stroke={charColors[idx % charColors.length]}
+            stroke-width="1.5"
+            opacity="0.5"
           />
 
-          <!-- Dots at each coprime n -->
+          <!-- Continuous sinusoidal curve (Im part, if complex) -->
+          {#if waveform.points.some(p => p.coprime && Math.abs(p.im) > 0.01)}
+            <path
+              d={continuousSinePath(idx, 'im')}
+              fill="none"
+              stroke={charColors[idx % charColors.length]}
+              stroke-width="1"
+              stroke-dasharray="5,3"
+              opacity="0.3"
+            />
+          {/if}
+
+          <!-- Stem lines from zero to each coprime integer value -->
+          {#each waveform.points as p}
+            {#if p.coprime}
+              <line
+                x1={xScale(p.n)} y1={yScale(0)}
+                x2={xScale(p.n)} y2={yScale(p.re)}
+                stroke={charColors[idx % charColors.length]}
+                stroke-width="0.7"
+                opacity="0.3"
+              />
+            {/if}
+          {/each}
+
+          <!-- Sample dots at each coprime n -->
           {#each waveform.points as p}
             {#if p.coprime}
               <circle
                 cx={xScale(p.n)}
                 cy={yScale(p.re)}
-                r={p.prime ? 3.5 : 2}
-                fill={p.prime ? 'var(--color-prime)' : charColors[waveform.index % charColors.length]}
-                opacity={p.prime ? 1 : 0.6}
+                r={p.prime ? 4 : 2.5}
+                fill={p.prime ? 'var(--color-prime)' : charColors[idx % charColors.length]}
+                stroke={p.prime ? 'var(--color-prime)' : 'white'}
+                stroke-width={p.prime ? 0 : 0.75}
+                opacity={p.prime ? 1 : 0.85}
               />
             {/if}
           {/each}
-
-          <!-- Im part as dashed line if present -->
-          {#if waveform.points.some(p => p.coprime && Math.abs(p.im) > 0.01)}
-            <path
-              d={smoothWavePath(waveform, 'im')}
-              fill="none"
-              stroke={charColors[waveform.index % charColors.length]}
-              stroke-width="1"
-              stroke-dasharray="4,3"
-              opacity="0.45"
-            />
-          {/if}
 
           <!-- Current n marker -->
           {#if animN >= 1 && animN <= maxN}
             <line
               x1={xScale(animN)} y1={waveMargin.top}
               x2={xScale(animN)} y2={waveH - waveMargin.bottom}
-              stroke="var(--color-text)" stroke-width="0.75" opacity="0.3"
+              stroke="var(--color-text)" stroke-width="0.75" opacity="0.25"
             />
           {/if}
 
@@ -274,9 +358,10 @@
     {/each}
 
     <div class="wave-legend">
-      <span class="legend-item"><span class="legend-line solid"></span> Real part Re(χ(n))</span>
-      <span class="legend-item"><span class="legend-line dashed"></span> Imaginary part Im(χ(n))</span>
-      <span class="legend-item"><span class="legend-dot prime"></span> Prime n</span>
+      <span class="legend-item"><span class="legend-line solid"></span> Re(χ) continuous</span>
+      <span class="legend-item"><span class="legend-line dashed"></span> Im(χ) continuous</span>
+      <span class="legend-item"><span class="legend-dot sample"></span> Integer sample</span>
+      <span class="legend-item"><span class="legend-dot prime"></span> Prime</span>
     </div>
   </div>
 </div>
@@ -388,7 +473,12 @@
   .wave-note {
     font-size: 0.85rem;
     color: var(--color-text-muted);
-    margin-bottom: 0.5em;
+    margin-bottom: 0.8em;
+  }
+
+  .prime-note {
+    color: var(--color-prime);
+    font-weight: 500;
   }
 
   .waveform-row {
@@ -407,6 +497,7 @@
     margin-top: 0.5em;
     font-size: 0.75rem;
     color: var(--color-text-muted);
+    flex-wrap: wrap;
   }
 
   .legend-item {
@@ -416,24 +507,32 @@
   }
 
   .legend-line {
-    width: 16px;
+    width: 18px;
     height: 2px;
     border-radius: 1px;
   }
 
   .legend-line.solid {
     background: var(--color-char-0);
+    opacity: 0.6;
   }
 
   .legend-line.dashed {
-    background: repeating-linear-gradient(90deg, var(--color-char-0) 0 4px, transparent 4px 7px);
-    opacity: 0.5;
+    background: repeating-linear-gradient(90deg, var(--color-char-0) 0 5px, transparent 5px 8px);
+    opacity: 0.4;
   }
 
-  .legend-dot.prime {
+  .legend-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
+  }
+
+  .legend-dot.sample {
+    background: var(--color-char-0);
+  }
+
+  .legend-dot.prime {
     background: var(--color-prime);
   }
 

@@ -179,3 +179,79 @@ export function evalCharacter(char, n) {
   const key = ((n % q) + q) % q;
   return char.values.get(key) || [0, 0];
 }
+
+// Return the group structure, discrete log table, and character frequency indices
+// needed for continuous sinusoidal evaluation of characters.
+//
+// For each character chi_k, the value at a coprime residue n is:
+//   chi_k(n) = product_i  exp(2*pi*i * freqs[k][i] * dlog(n)[i] / orders[i])
+//
+// The continuous extension replaces the integer dlog with a continuous parameter.
+export function characterContinuousData(q) {
+  if (q <= 1) {
+    return {
+      generators: [1], orders: [1], residues: [1],
+      dlog: new Map([[1, [0]]]),
+      charFreqs: [[0]]
+    };
+  }
+
+  const { generators, orders, residues } = groupStructure(q);
+  const phi = residues.length;
+
+  // Rebuild the dlog table
+  const dlog = new Map();
+  function enumerate(idx, current, exponents) {
+    if (idx === generators.length) {
+      dlog.set(current, [...exponents]);
+      return;
+    }
+    const g = generators[idx];
+    const ord = orders[idx];
+    let pow = current;
+    for (let e = 0; e < ord; e++) {
+      exponents[idx] = e;
+      enumerate(idx + 1, pow, exponents);
+      pow = (pow * g) % q;
+    }
+  }
+  if (generators.length > 0) {
+    enumerate(0, 1, new Array(generators.length).fill(0));
+  } else {
+    dlog.set(1, []);
+  }
+
+  // Enumerate character frequency indices
+  const charFreqs = [];
+  function enumerateFreqs(idx, indices) {
+    if (idx === generators.length) {
+      charFreqs.push([...indices]);
+      return;
+    }
+    for (let k = 0; k < orders[idx]; k++) {
+      indices[idx] = k;
+      enumerateFreqs(idx + 1, indices);
+    }
+  }
+  enumerateFreqs(0, new Array(generators.length).fill(0));
+
+  return { generators, orders, residues, dlog, charFreqs };
+}
+
+// Evaluate a character continuously.
+// Given character frequency indices freqs[], group orders[], and a continuous
+// "phase vector" t[] (one per generator), compute:
+//   product_i  exp(2*pi*i * freqs[i] * t[i] / orders[i])
+export function evalCharacterContinuous(freqs, orders, t) {
+  let re = 1, im = 0;
+  for (let i = 0; i < freqs.length; i++) {
+    const angle = (2 * Math.PI * freqs[i] * t[i]) / orders[i];
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const newRe = re * c - im * s;
+    const newIm = re * s + im * c;
+    re = newRe;
+    im = newIm;
+  }
+  return [re, im];
+}
