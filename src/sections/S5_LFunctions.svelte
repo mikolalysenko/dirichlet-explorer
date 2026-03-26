@@ -173,27 +173,50 @@
     <EulerProductViz s={eulerS} numPrimes={eulerPrimes} />
   </div>
 
-  <h3>L-functions: the character-weighted machine</h3>
+  <h3>L-functions: why weight by characters?</h3>
 
-  <p>Now we combine our two ideas. Instead of summing <Tex tex="1/n^s" />,
-  we weight each term by a character value <Tex tex="\chi(n)" />:</p>
+  <p>We now have two powerful tools:</p>
+  <ul>
+    <li>The <strong>Euler product</strong> connects <Tex tex={String.raw`\sum 1/n^s`} /> to primes.</li>
+    <li>The <strong>character filter</strong> can pick out one residue class from all integers.</li>
+  </ul>
+
+  <p>Our goal is to count primes in one column — primes <Tex tex={String.raw`p \equiv a \pmod{q}`} />.
+  The character filter does this by weighting each number <Tex tex="n" /> by the arrow <Tex tex={String.raw`\overline{\chi(a)} \chi(n)`} />,
+  summed over all characters. So we naturally want to study sums like:</p>
+
+  <Tex display tex={String.raw`\sum_{n=1}^{\infty} \frac{\chi(n)}{n^s}`} />
+
+  <p>This is not a random definition — it's <em>exactly what you're forced to consider</em>
+  when you plug the character filter into the zeta machinery. We give it a name:
+  the <strong>Dirichlet L-function</strong>:</p>
 
   <Tex display tex={String.raw`L(s, \chi) = \sum_{n=1}^{\infty} \frac{\chi(n)}{n^s}`} />
 
-  <p>Because characters are multiplicative, the Euler product still works:</p>
+  <p>Now here's the payoff: because characters are multiplicative
+  (<Tex tex={String.raw`\chi(ab) = \chi(a)\chi(b)`} />), the same Euler product argument works.
+  Each term <Tex tex={String.raw`\chi(n)/n^s`} /> factors over the prime factorization of <Tex tex="n" />,
+  so the sum over all <Tex tex="n" /> becomes a product over primes:</p>
 
   <Tex display tex={String.raw`L(s, \chi) = \prod_{p} \frac{1}{1 - \chi(p) \, p^{-s}}`} />
 
-  <p>The crucial difference: for the <strong>principal character</strong> <Tex tex="\chi_0" />
+  <p>This is the same miracle as before, but now each prime's factor is twisted by the
+  character value <Tex tex={String.raw`\chi(p)`} /> — an arrow on the unit circle. Different
+  characters weight the primes differently, and that's what lets us isolate one column.</p>
+
+  <h4>What happens at <Tex tex="s = 1" />?</h4>
+
+  <p>For the <strong>principal character</strong> <Tex tex="\chi_0" />
   (which assigns 1 to everything coprime to <Tex tex="q" />), the L-function is essentially
   the zeta function — it <em>blows up</em> at <Tex tex="s = 1" />.
-  (Why? Because <Tex tex="\chi_0(n) = 1" /> for coprime <Tex tex="n" />, so the sum is nearly the
-  same as <Tex tex="\zeta(s)" />, just missing the few terms where <Tex tex="n" /> shares a factor with <Tex tex="q" />.
-  Removing finitely many factors from the Euler product doesn't prevent the divergence.)</p>
+  (Because <Tex tex="\chi_0(n) = 1" /> for coprime <Tex tex="n" />, the sum is nearly
+  <Tex tex="\zeta(s)" />, just missing a few terms. Removing finitely many Euler factors doesn't
+  prevent the divergence.)</p>
 
-  <p>For non-principal characters, the sum <Tex tex={String.raw`\sum \chi(n)/n^s`} /> doesn't diverge at <Tex tex="s = 1" />.
-  Intuitively, this is because the arrows <Tex tex="\chi(n)" /> point in different directions and partially cancel,
-  preventing the sum from blowing up. (The character values within each period sum to zero, creating cancellation.)</p>
+  <p>For non-principal characters, the arrows <Tex tex="\chi(n)" /> point in different directions
+  and partially cancel. Within each period of <Tex tex="q" /> consecutive integers, the character
+  values sum to zero — so the weighted sum doesn't pile up. The L-function stays
+  <strong>finite</strong> at <Tex tex="s = 1" />.</p>
 
   <div class="viz-container">
     <h4>L-functions for all characters mod {plotQ}</h4>
