@@ -1,0 +1,200 @@
+<script>
+  import Section from '../components/layout/Section.svelte';
+  import Tex from '../components/Tex.svelte';
+  import Callout from '../components/ui/Callout.svelte';
+  import FactorTree from '../components/viz/FactorTree.svelte';
+  import Slider from '../components/ui/Slider.svelte';
+  import { isPrime, listPrimes } from '../lib/primes.js';
+  import { factorize } from '../lib/math-utils.js';
+
+  let treeNumber = 60;
+  let euclidPrimes = [2, 3, 5];
+  let densityMax = 100;
+
+  $: product = euclidPrimes.reduce((a, b) => a * b, 1);
+  $: plusOne = product + 1;
+  $: plusOneFactors = factorize(plusOne);
+  $: newPrime = plusOneFactors.find(f => !euclidPrimes.includes(f));
+
+  function addPrime() {
+    if (newPrime && !euclidPrimes.includes(newPrime)) {
+      euclidPrimes = [...euclidPrimes, newPrime].sort((a, b) => a - b);
+    }
+  }
+
+  // Prime density data
+  $: densityBins = (() => {
+    const binSize = 10;
+    const bins = [];
+    for (let start = 1; start <= densityMax; start += binSize) {
+      let count = 0;
+      for (let n = start; n < start + binSize && n <= densityMax; n++) {
+        if (isPrime(n)) count++;
+      }
+      bins.push({ start, count, total: binSize });
+    }
+    return bins;
+  })();
+</script>
+
+<Section id="primes" title="Primes — The Atoms of Numbers" subtitle="Every whole number is built from primes, and there are infinitely many of them.">
+
+  <p>A <strong>prime number</strong> is a whole number greater than 1 that can only be divided evenly
+  by 1 and itself. The first few primes are: <span class="prime-number">2, 3, 5, 7, 11, 13, 17, 19, 23, ...</span></p>
+
+  <p>Why "atoms"? Because every whole number can be broken down into a product of primes,
+  and that breakdown is <em>unique</em>. For example, <span class="number">60 = 2 &times; 2 &times; 3 &times; 5</span>.
+  Try clicking the numbers below to break them apart:</p>
+
+  <div class="viz-container">
+    <h4>Factor Tree — click numbers to split them</h4>
+    <div class="slider-row">
+      <label>Number:</label>
+      <input type="number" bind:value={treeNumber} min="2" max="500" class="number-input" />
+    </div>
+    <FactorTree startNumber={treeNumber} />
+  </div>
+
+  <h3>Are there infinitely many primes?</h3>
+
+  <p>Yes! This was proven over 2,000 years ago by the Greek mathematician <strong>Euclid</strong>.
+  His argument is wonderfully clever:</p>
+
+  <Callout type="insight">
+    <p><strong>Euclid's Argument:</strong> Suppose you think you have a complete list of all primes.
+    Multiply them all together and add 1. None of the primes on your list can divide this new number
+    evenly (there's always a remainder of 1). So this new number must have a prime factor
+    not on your list — contradiction! There must always be more primes.</p>
+  </Callout>
+
+  <div class="viz-container">
+    <h4>Euclid's argument in action</h4>
+    <p>Your "complete" list of primes: <strong class="prime-number">{euclidPrimes.join(' × ')}</strong></p>
+    <p>Product: <span class="number">{euclidPrimes.join(' × ')} = {product}</span></p>
+    <p>Product + 1 = <span class="number">{plusOne}</span></p>
+    <p>
+      None of your listed primes divide {plusOne} evenly!
+      {#if plusOneFactors.length > 0}
+        Its prime factors are: <strong class="prime-number">{plusOneFactors.join(', ')}</strong>
+      {/if}
+    </p>
+    {#if newPrime}
+      <button class="add-prime-btn" on:click={addPrime}>
+        Add {newPrime} to the list and try again
+      </button>
+    {/if}
+  </div>
+
+  <h3>Primes thin out, but never stop</h3>
+
+  <p>As numbers get bigger, primes become rarer. But they never disappear entirely.
+  Here's a look at how the density of primes changes:</p>
+
+  <div class="viz-container">
+    <h4>Prime density — how many primes per group of 10</h4>
+    <Slider label="Show up to" bind:value={densityMax} min={50} max={500} step={50} format={v => v} />
+    <div class="density-chart">
+      {#each densityBins as bin}
+        <div class="density-bar-col">
+          <div
+            class="density-bar"
+            style="height: {bin.count * 18}px"
+          >
+            {#if bin.count > 0}
+              <span class="bar-label">{bin.count}</span>
+            {/if}
+          </div>
+          <span class="bin-label">{bin.start}</span>
+        </div>
+      {/each}
+    </div>
+    <p class="density-note">Each bar shows how many primes are in that group of 10 numbers.
+    Notice: the bars get shorter on average, but never reach zero!</p>
+  </div>
+
+  <Callout>
+    <p><strong>The big question:</strong> Primes are infinite — but are they spread out <em>evenly</em>?
+    What if we only look at certain kinds of numbers? That's what we'll explore next.</p>
+  </Callout>
+
+</Section>
+
+<style>
+  .number-input {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    width: 80px;
+    padding: 0.3em 0.5em;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    text-align: center;
+  }
+
+  .add-prime-btn {
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    padding: 0.5em 1.2em;
+    background: var(--color-accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 0.5em;
+    transition: background 0.15s ease;
+  }
+
+  .add-prime-btn:hover {
+    background: #1d4ed8;
+  }
+
+  .density-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 120px;
+    margin: 1em 0;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--color-border-light);
+    overflow-x: auto;
+  }
+
+  .density-bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 22px;
+    flex: 1;
+  }
+
+  .density-bar {
+    background: var(--color-prime-bg);
+    border: 1px solid var(--color-prime);
+    border-radius: 3px 3px 0 0;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    transition: height 0.3s ease;
+  }
+
+  .bar-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--color-prime);
+    font-weight: 600;
+    padding: 1px;
+  }
+
+  .bin-label {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    color: var(--color-text-light);
+    margin-top: 3px;
+  }
+
+  .density-note {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+  }
+</style>
