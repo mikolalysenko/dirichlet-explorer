@@ -23,10 +23,13 @@ A motivated 12–14 year old who knows arithmetic, primes, and basic algebra. No
 ## Sections
 
 ### 0. Hook
-**Takeaway:** "Pick any coprime start and step — primes keep showing up forever."
+**Takeaway:** "Coprime progressions are rich with primes; non-coprime ones are barren."
 
-- Interactive number line: choose *a* and *q* with sliders, watch primes light up in the progression.
-- Counter shows primes found. The answer is always: infinitely many.
+- Interactive number line: choose *a* and *q*. ALL values of *a* are shown (1 to q).
+- Coprime values in blue, non-coprime in red. User can select either.
+- **Coprime case:** counter shows primes found, message "infinitely more!"
+- **Non-coprime case:** shows the common factor, explains every term is divisible by it, reports 0 or 1 primes. Dramatic contrast motivates the theorem.
+- Bridge text invites switching between blue/red to see the difference.
 
 ### 1. Primes — the atoms of numbers
 **Takeaway:** "Every number factors into primes uniquely, and there are infinitely many primes."
