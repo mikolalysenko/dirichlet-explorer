@@ -77,7 +77,7 @@
     <li>If <Tex tex="m" /> is anything else, the arrows point in different directions and <strong>cancel to 0</strong>.</li>
   </ul>
 
-  <Tex display tex="\frac{'{1}'}{'{\\varphi(q)}'} \sum_\chi \overline{'{\\chi(a)}'} \, \chi(m) = \begin{'{cases}'} 1 & \text{'{if }'} m \equiv a \pmod{'{q}'} \\ 0 & \text{'{otherwise}'} \end{'{cases}'}" />
+  <Tex display tex={String.raw`\frac{1}{\varphi(q)} \sum_\chi \overline{\chi(a)} \, \chi(m) = \begin{cases} 1 & \text{if } m \equiv a \pmod{q} \\ 0 & \text{otherwise} \end{cases}`} />
 
   <p>This is the <strong>extraction formula</strong> — Dirichlet's radio tuner! Watch it in action:</p>
 
@@ -122,7 +122,7 @@
   <Callout type="insight">
     <p><strong>The power of the filter:</strong> By summing over all characters with the right
     weights, we can write a formula that picks out <em>exactly</em> the primes in one column:</p>
-    <Tex display tex="\sum_{'\\substack{p \\text{ prime} \\\\ p \\equiv a \\pmod{q}}'} \frac{'{1}'}{'{p^s}'} = \frac{'{1}'}{'{\\varphi(q)}'} \sum_\chi \overline{'{\\chi(a)}'} \sum_p \frac{'{\\chi(p)}'}{'{p^s}'}" />
+    <Tex display tex={String.raw`\sum_{\substack{p \text{ prime} \\ p \equiv a \pmod{q}}} \frac{1}{p^s} = \frac{1}{\varphi(q)} \sum_\chi \overline{\chi(a)} \sum_p \frac{\chi(p)}{p^s}`} />
     <p>The left side is what we want (primes in one column). The right side breaks it into
     pieces — one for each character — that we can analyze separately.</p>
   </Callout>

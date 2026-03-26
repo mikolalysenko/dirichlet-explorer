@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from 'svelte';
-  import { dirichletCharacters, characterContinuousData, evalCharacterContinuous } from '../../lib/characters.js';
+  import { dirichletCharacters } from '../../lib/characters.js';
   import { coprimeResidues, gcd } from '../../lib/math-utils.js';
   import { isPrime } from '../../lib/primes.js';
 
@@ -9,117 +9,9 @@
 
   $: characters = dirichletCharacters(q);
   $: residues = coprimeResidues(q);
-  $: contData = characterContinuousData(q);
+  $: phi = residues.length;
 
-  // Build the mapping from integer n to the continuous phase parameter.
-  // Each coprime integer increments the phase by 1 in the "discrete log" space.
-  // For the primary generator, the phase at coprime n is dlog(n mod q)[0],
-  // and we accumulate full-period offsets as n wraps around.
-  //
-  // We assign each coprime integer a sequential index (0, 1, 2, ...),
-  // and the continuous sinusoidal curve interpolates between these.
-  $: coprimeSequence = (() => {
-    const seq = [];
-    for (let n = 1; n <= maxN; n++) {
-      if (gcd(n, q) === 1) {
-        const r = ((n % q) + q) % q;
-        const dlogVec = contData.dlog.get(r);
-        seq.push({
-          n,
-          seqIndex: seq.length,
-          dlog: dlogVec || new Array(contData.generators.length).fill(0),
-          prime: isPrime(n)
-        });
-      }
-    }
-    return seq;
-  })();
-
-  // For the continuous sinusoidal waveform:
-  // We parameterize by a continuous variable t that linearly interpolates
-  // between consecutive coprime integers on the x-axis.
-  // At each coprime integer n_k, the "phase" is its discrete log vector.
-  // Between n_k and n_{k+1}, the phase linearly interpolates between
-  // dlog(n_k) and dlog(n_{k+1}), with wrapping for the cyclic structure.
-  //
-  // This means the curve is: chi(t) = exp(2πi * freq · phase(t) / order)
-  // where phase(t) smoothly advances.
-
-  // Precompute unwrapped phase for each coprime integer.
-  // The raw dlog jumps around; we unwrap it so the phase increases monotonically
-  // (advancing by the right amount each step for a smooth sinusoid).
-  $: unwrappedPhases = (() => {
-    if (coprimeSequence.length === 0) return [];
-    const nGens = contData.generators.length;
-    const phases = [];
-
-    // Track cumulative phase per generator
-    const cumPhase = new Array(nGens).fill(0);
-    const prevDlog = new Array(nGens).fill(0);
-
-    for (let k = 0; k < coprimeSequence.length; k++) {
-      const pt = coprimeSequence[k];
-      if (k === 0) {
-        // First point: phase = dlog
-        for (let i = 0; i < nGens; i++) {
-          cumPhase[i] = pt.dlog[i];
-          prevDlog[i] = pt.dlog[i];
-        }
-      } else {
-        for (let i = 0; i < nGens; i++) {
-          // Compute the step in dlog space (mod order)
-          let delta = pt.dlog[i] - prevDlog[i];
-          const ord = contData.orders[i];
-          // Wrap delta to [-ord/2, ord/2] for minimal-distance unwrap
-          while (delta > ord / 2) delta -= ord;
-          while (delta < -ord / 2) delta += ord;
-          cumPhase[i] += delta;
-          prevDlog[i] = pt.dlog[i];
-        }
-      }
-      phases.push([...cumPhase]);
-    }
-    return phases;
-  })();
-
-  // Generate the continuous sinusoidal path for a given character
-  function continuousSinePath(charIndex, part) {
-    const freqs = contData.charFreqs[charIndex];
-    if (!freqs || coprimeSequence.length < 2) return '';
-    const orders = contData.orders;
-    const samplesPerSegment = 12;
-    const points = [];
-
-    for (let k = 0; k < coprimeSequence.length - 1; k++) {
-      const n0 = coprimeSequence[k].n;
-      const n1 = coprimeSequence[k + 1].n;
-      const phase0 = unwrappedPhases[k];
-      const phase1 = unwrappedPhases[k + 1];
-
-      for (let s = 0; s <= samplesPerSegment; s++) {
-        // Skip last sample except on final segment (avoid duplicates)
-        if (s === samplesPerSegment && k < coprimeSequence.length - 2) continue;
-
-        const frac = s / samplesPerSegment;
-        // Linearly interpolate x-position and phase
-        const x = n0 + (n1 - n0) * frac;
-        const t = [];
-        for (let i = 0; i < freqs.length; i++) {
-          t.push(phase0[i] + (phase1[i] - phase0[i]) * frac);
-        }
-        const val = evalCharacterContinuous(freqs, orders, t);
-        const y = part === 're' ? val[0] : val[1];
-        points.push({ x, y });
-      }
-    }
-
-    if (points.length === 0) return '';
-    return points.map((p, i) =>
-      `${i === 0 ? 'M' : 'L'}${xScale(p.x)},${yScale(p.y)}`
-    ).join(' ');
-  }
-
-  // Also evaluate at each coprime integer (for the dot overlay)
+  // Evaluate each character at every integer from 1..maxN
   $: waveforms = characters.map((chi, idx) => {
     const points = [];
     for (let n = 1; n <= maxN; n++) {
@@ -128,6 +20,132 @@
     }
     return { chi, points, index: idx };
   });
+
+  // Build the coprime sequence with sequential index
+  $: coprimeSeq = (() => {
+    const seq = [];
+    for (let n = 1; n <= maxN; n++) {
+      if (gcd(n, q) === 1) {
+        seq.push({ n, idx: seq.length, prime: isPrime(n) });
+      }
+    }
+    return seq;
+  })();
+
+  // For each character, get its values at the coprime sequence points.
+  // These are periodic with period phi(q). The continuous interpolation
+  // uses trigonometric (Fourier) interpolation: since the character values
+  // ARE a single Fourier mode on the group, the exact interpolant through
+  // one period is a sinusoid. We reconstruct it via DFT interpolation.
+  //
+  // For one period of phi values y_0..y_{phi-1}, the trig interpolant at
+  // fractional position t (0 <= t < phi) is:
+  //   y(t) = (1/phi) * sum_{k=0}^{phi-1} Y_k * exp(2*pi*i*k*t/phi)
+  // where Y_k = sum_{j=0}^{phi-1} y_j * exp(-2*pi*i*k*j/phi) is the DFT.
+  //
+  // But since each character IS a single frequency, this simplifies enormously.
+  // We just precompute the DFT of one period and evaluate.
+
+  function trigInterp(samples, t) {
+    // samples: array of [re, im] of length phi
+    // t: continuous index (0 = first sample, 1 = second, etc.)
+    // Returns interpolated [re, im]
+    const N = samples.length;
+    if (N === 0) return [0, 0];
+    if (N === 1) return samples[0];
+
+    // Direct evaluation of trig interpolation (Dirichlet kernel form):
+    // y(t) = (1/N) * sum_{j=0}^{N-1} y_j * D_N(t - j)
+    // where D_N(x) = sum_{k=0}^{N-1} exp(2*pi*i*k*x/N) = sin(pi*x) / sin(pi*x/N) * exp(i*pi*x*(N-1)/N)
+    // For real + imaginary parts, we use the real Dirichlet kernel:
+    // D_N(x) = sin(N*pi*x/N) / sin(pi*x/N) when x is not integer = N when x is integer
+    // Actually the periodic sinc (Dirichlet kernel) for even/odd N differs.
+    //
+    // Simpler: just evaluate the DFT formula directly.
+    let re = 0, im = 0;
+    for (let k = 0; k < N; k++) {
+      // Compute DFT coefficient Y_k
+      let Yre = 0, Yim = 0;
+      for (let j = 0; j < N; j++) {
+        const angle = -2 * Math.PI * k * j / N;
+        const c = Math.cos(angle), s = Math.sin(angle);
+        Yre += samples[j][0] * c - samples[j][1] * s;
+        Yim += samples[j][0] * s + samples[j][1] * c;
+      }
+      // Multiply by exp(2*pi*i*k*t/N) / N
+      const angle2 = 2 * Math.PI * k * t / N;
+      const c2 = Math.cos(angle2), s2 = Math.sin(angle2);
+      re += (Yre * c2 - Yim * s2) / N;
+      im += (Yre * s2 + Yim * c2) / N;
+    }
+    return [re, im];
+  }
+
+  // For each character, extract one period of samples (at the coprime residues)
+  $: periodSamples = characters.map(chi => {
+    return residues.map(r => chi.values.get(r) || [0, 0]);
+  });
+
+  // Precompute DFT coefficients for each character (avoid recomputing per curve point)
+  $: dftCoeffs = periodSamples.map(samples => {
+    const N = samples.length;
+    const coeffs = [];
+    for (let k = 0; k < N; k++) {
+      let Yre = 0, Yim = 0;
+      for (let j = 0; j < N; j++) {
+        const angle = -2 * Math.PI * k * j / N;
+        Yre += samples[j][0] * Math.cos(angle) - samples[j][1] * Math.sin(angle);
+        Yim += samples[j][0] * Math.sin(angle) + samples[j][1] * Math.cos(angle);
+      }
+      coeffs.push([Yre, Yim]);
+    }
+    return coeffs;
+  });
+
+  // Fast trig interpolation using precomputed DFT
+  function trigInterpFast(coeffs, N, t) {
+    let re = 0, im = 0;
+    for (let k = 0; k < N; k++) {
+      const angle = 2 * Math.PI * k * t / N;
+      const c = Math.cos(angle), s = Math.sin(angle);
+      re += (coeffs[k][0] * c - coeffs[k][1] * s) / N;
+      im += (coeffs[k][0] * s + coeffs[k][1] * c) / N;
+    }
+    return [re, im];
+  }
+
+  // Generate continuous curve for a character.
+  // x-axis = integer n, but the sinusoid is parameterized by the sequential
+  // coprime index. Between coprime integers we interpolate the index linearly
+  // in x-space, and evaluate the trig interpolant at the fractional index.
+  function continuousSinePath(charIdx, part) {
+    const coeffs = dftCoeffs[charIdx];
+    if (!coeffs || coprimeSeq.length < 2) return '';
+    const N = phi;
+    const samplesPerSegment = 16;
+    const points = [];
+
+    for (let k = 0; k < coprimeSeq.length - 1; k++) {
+      const n0 = coprimeSeq[k].n;
+      const n1 = coprimeSeq[k + 1].n;
+      const t0 = k; // sequential index of first point
+      const t1 = k + 1;
+
+      for (let s = 0; s <= samplesPerSegment; s++) {
+        if (s === samplesPerSegment && k < coprimeSeq.length - 2) continue;
+        const frac = s / samplesPerSegment;
+        const x = n0 + (n1 - n0) * frac;
+        const t = t0 + (t1 - t0) * frac;
+        const val = trigInterpFast(coeffs, N, t);
+        points.push({ x, y: part === 're' ? val[0] : val[1] });
+      }
+    }
+
+    if (points.length === 0) return '';
+    return points.map((p, i) =>
+      `${i === 0 ? 'M' : 'L'}${xScale(p.x)},${yScale(p.y)}`
+    ).join(' ');
+  }
 
   const charColors = [
     '#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444',
@@ -209,13 +227,10 @@
       {#each currentPhasors as phasor}
         <div class="phasor-wheel">
           <svg width={phasorSize} height={phasorSize} viewBox="0 0 {phasorSize} {phasorSize}">
-            <!-- Unit circle -->
             <circle cx={phasorCx} cy={phasorCy} r={phasorR} fill="none" stroke="var(--color-border-light)" stroke-width="0.75" />
-            <!-- Axes -->
             <line x1={phasorCx - phasorR} y1={phasorCy} x2={phasorCx + phasorR} y2={phasorCy} stroke="var(--color-border-light)" stroke-width="0.5" />
             <line x1={phasorCx} y1={phasorCy - phasorR} x2={phasorCx} y2={phasorCy + phasorR} stroke="var(--color-border-light)" stroke-width="0.5" />
 
-            <!-- Trail: show previous coprime values as fading dots -->
             {#each Array(Math.min(q, 8)) as _, k}
               {@const prevN = animN - k - 1}
               {#if prevN >= 1}
@@ -232,7 +247,6 @@
               {/if}
             {/each}
 
-            <!-- Phasor arrow -->
             {#if gcd(animN, q) === 1}
               <line
                 x1={phasorCx} y1={phasorCy}
@@ -265,8 +279,8 @@
     <h4>Continuous character waveforms</h4>
     <p class="wave-note">
       Each character is a complex exponential sampled at the coprime integers — just like a
-      Fourier harmonic. The smooth sinusoidal curve shows the underlying continuous wave;
-      the dots mark the actual integer sample points.
+      Fourier harmonic. The smooth curve is the exact trigonometric interpolation through the
+      sample points; the dots mark the integer values.
       <span class="prime-note">Gold dots = primes.</span>
     </p>
 
@@ -278,12 +292,10 @@
           <line x1={waveMargin.left} y1={yScale(1)} x2={waveW - waveMargin.right} y2={yScale(1)} stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="3,3" />
           <line x1={waveMargin.left} y1={yScale(-1)} x2={waveW - waveMargin.right} y2={yScale(-1)} stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="3,3" />
 
-          <!-- Y-axis labels -->
           <text x={waveMargin.left - 4} y={yScale(1)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">1</text>
           <text x={waveMargin.left - 4} y={yScale(-1)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">-1</text>
           <text x={waveMargin.left - 4} y={yScale(0)} text-anchor="end" dominant-baseline="central" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">0</text>
 
-          <!-- Character label -->
           <text x={8} y={waveH / 2} dominant-baseline="central" font-size="12" font-family="var(--font-mono)" font-weight="600"
             fill={charColors[idx % charColors.length]}>
             {waveform.chi.label}
@@ -318,7 +330,7 @@
                 x2={xScale(p.n)} y2={yScale(p.re)}
                 stroke={charColors[idx % charColors.length]}
                 stroke-width="0.7"
-                opacity="0.3"
+                opacity="0.25"
               />
             {/if}
           {/each}
@@ -333,7 +345,6 @@
                 fill={p.prime ? 'var(--color-prime)' : charColors[idx % charColors.length]}
                 stroke={p.prime ? 'var(--color-prime)' : 'white'}
                 stroke-width={p.prime ? 0 : 0.75}
-                opacity={p.prime ? 1 : 0.85}
               />
             {/if}
           {/each}
@@ -367,176 +378,31 @@
 </div>
 
 <style>
-  .phasor-viz {
-    width: 100%;
-  }
-
-  .phasor-section {
-    margin-bottom: 2em;
-  }
-
-  .phasor-header h4 {
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-muted);
-    margin-bottom: 0.5em;
-  }
-
-  .coprime-tag {
-    font-size: 0.75rem;
-    background: var(--color-accent-light);
-    color: var(--color-accent);
-    padding: 0.15em 0.5em;
-    border-radius: 4px;
-    text-transform: none;
-    letter-spacing: 0;
-    font-weight: 500;
-    margin-left: 0.3em;
-  }
-
-  .zero-tag {
-    font-size: 0.75rem;
-    background: var(--color-bg-alt);
-    color: var(--color-text-light);
-    padding: 0.15em 0.5em;
-    border-radius: 4px;
-    text-transform: none;
-    letter-spacing: 0;
-    margin-left: 0.3em;
-  }
-
-  .play-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.6em;
-    margin-bottom: 0.5em;
-  }
-
-  .play-btn {
-    font-family: var(--font-serif);
-    font-size: 0.85rem;
-    padding: 0.3em 1em;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: white;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap;
-  }
-
-  .play-btn:hover {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-  }
-
-  .n-slider {
-    flex: 1;
-    max-width: 300px;
-  }
-
-  .n-label {
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    color: var(--color-accent);
-    font-weight: 600;
-    min-width: 30px;
-    text-align: right;
-  }
-
-  .phasor-wheels {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3em;
-    justify-content: center;
-  }
-
-  .phasor-wheel {
-    text-align: center;
-  }
-
-  .phasor-label {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-top: -0.3em;
-  }
-
-  .waveform-section h4 {
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-muted);
-    margin-bottom: 0.3em;
-  }
-
-  .wave-note {
-    font-size: 0.85rem;
-    color: var(--color-text-muted);
-    margin-bottom: 0.8em;
-  }
-
-  .prime-note {
-    color: var(--color-prime);
-    font-weight: 500;
-  }
-
-  .waveform-row {
-    margin-bottom: -0.3em;
-  }
-
-  .waveform-svg {
-    width: 100%;
-    height: auto;
-  }
-
-  .wave-legend {
-    display: flex;
-    gap: 1.2em;
-    justify-content: center;
-    margin-top: 0.5em;
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    flex-wrap: wrap;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.3em;
-  }
-
-  .legend-line {
-    width: 18px;
-    height: 2px;
-    border-radius: 1px;
-  }
-
-  .legend-line.solid {
-    background: var(--color-char-0);
-    opacity: 0.6;
-  }
-
-  .legend-line.dashed {
-    background: repeating-linear-gradient(90deg, var(--color-char-0) 0 5px, transparent 5px 8px);
-    opacity: 0.4;
-  }
-
-  .legend-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-  }
-
-  .legend-dot.sample {
-    background: var(--color-char-0);
-  }
-
-  .legend-dot.prime {
-    background: var(--color-prime);
-  }
-
-  circle, line {
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  }
+  .phasor-viz { width: 100%; }
+  .phasor-section { margin-bottom: 2em; }
+  .phasor-header h4 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); margin-bottom: 0.5em; }
+  .coprime-tag { font-size: 0.75rem; background: var(--color-accent-light); color: var(--color-accent); padding: 0.15em 0.5em; border-radius: 4px; text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 0.3em; }
+  .zero-tag { font-size: 0.75rem; background: var(--color-bg-alt); color: var(--color-text-light); padding: 0.15em 0.5em; border-radius: 4px; text-transform: none; letter-spacing: 0; margin-left: 0.3em; }
+  .play-controls { display: flex; align-items: center; gap: 0.6em; margin-bottom: 0.5em; }
+  .play-btn { font-family: var(--font-serif); font-size: 0.85rem; padding: 0.3em 1em; border: 1px solid var(--color-border); border-radius: 6px; background: white; cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
+  .play-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .n-slider { flex: 1; max-width: 300px; }
+  .n-label { font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-accent); font-weight: 600; min-width: 30px; text-align: right; }
+  .phasor-wheels { display: flex; flex-wrap: wrap; gap: 0.3em; justify-content: center; }
+  .phasor-wheel { text-align: center; }
+  .phasor-label { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; margin-top: -0.3em; }
+  .waveform-section h4 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); margin-bottom: 0.3em; }
+  .wave-note { font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 0.8em; }
+  .prime-note { color: var(--color-prime); font-weight: 500; }
+  .waveform-row { margin-bottom: -0.3em; }
+  .waveform-svg { width: 100%; height: auto; }
+  .wave-legend { display: flex; gap: 1.2em; justify-content: center; margin-top: 0.5em; font-size: 0.75rem; color: var(--color-text-muted); flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 0.3em; }
+  .legend-line { width: 18px; height: 2px; border-radius: 1px; }
+  .legend-line.solid { background: var(--color-char-0); opacity: 0.6; }
+  .legend-line.dashed { background: repeating-linear-gradient(90deg, var(--color-char-0) 0 5px, transparent 5px 8px); opacity: 0.4; }
+  .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .legend-dot.sample { background: var(--color-char-0); }
+  .legend-dot.prime { background: var(--color-prime); }
+  circle, line { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
 </style>

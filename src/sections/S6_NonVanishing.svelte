@@ -78,7 +78,7 @@
   <p>This product has a remarkable property: when you expand it as a sum <Tex tex="\sum a_n / n^s" />,
   all the coefficients <Tex tex="a_n" /> are <strong>non-negative</strong>. Why? Because the orthogonality
   of characters means this product only "counts" prime powers that are
-  <Tex tex="\equiv 1 \pmod{'{q}'}" /> — and counting is always non-negative!</p>
+  <Tex tex={String.raw`\equiv 1 \pmod{q}`} /> — and counting is always non-negative!</p>
 
   <p>Since all coefficients are non-negative and the first coefficient is 1, the product is
   <strong>always at least 1</strong> for real <Tex tex="s > 1" />.</p>
@@ -132,8 +132,8 @@
   <Tex tex="s = 1" /> — one simple pole pushing the product toward infinity.</p>
 
   <p>Now suppose some complex character <Tex tex="\chi_1" /> had <Tex tex="L(1, \chi_1) = 0" />.
-  Since <Tex tex="\chi_1" /> is complex, its conjugate <Tex tex="\overline{'{\\chi_1}'}" /> is a
-  different character, and it would also have <Tex tex="L(1, \overline{'{\\chi_1}'}) = 0" />.
+  Since <Tex tex="\chi_1" /> is complex, its conjugate <Tex tex={String.raw`\overline{\chi_1}`} /> is a
+  different character, and it would also have <Tex tex={String.raw`L(1, \overline{\chi_1}) = 0`} />.
   That's <strong>two zeros</strong>.</p>
 
   <div class="tug-of-war">
@@ -143,7 +143,7 @@
     </div>
     <div class="tow-vs">vs</div>
     <div class="tow-side zero-side">
-      <div class="tow-label">2 zeros from <Tex tex="\chi_1, \overline{'{\\chi_1}'}" /></div>
+      <div class="tow-label">2 zeros from <Tex tex={String.raw`\chi_1, \overline{\chi_1}`} /></div>
       <div class="tow-arrow">&#x2193; Pushes DOWN</div>
     </div>
   </div>
@@ -159,7 +159,7 @@
 
   <h3>The subtle case: real characters</h3>
 
-  <p>A <strong>real character</strong> equals its own conjugate (<Tex tex="\chi = \overline{'{\\chi}'}" />),
+  <p>A <strong>real character</strong> equals its own conjugate (<Tex tex={String.raw`\chi = \overline{\chi}`} />),
   so a zero would only count once — exactly matching the one pole.
   The product argument alone isn't enough!</p>
 
@@ -169,7 +169,7 @@
   making the product analytic (well-behaved) everywhere for <Tex tex="s > 0" />.</p>
 
   <p>But here's the catch: the non-negative coefficients include terms like
-  <Tex tex="1/m^{'{2s}'}" /> for every integer <Tex tex="m" /> coprime to <Tex tex="q" />.
+  <Tex tex={String.raw`1/m^{2s}`} /> for every integer <Tex tex="m" /> coprime to <Tex tex="q" />.
   As <Tex tex="s \to 1/2" />, these terms alone diverge to infinity.
   A well-behaved function can't diverge — <strong>contradiction</strong>!</p>
 

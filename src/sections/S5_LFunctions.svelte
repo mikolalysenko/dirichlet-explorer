@@ -39,7 +39,7 @@
 
   <h3>Infinite sums that grow forever</h3>
 
-  <p>Consider adding up the fractions <Tex tex="\frac{'{1}'}{'{1}'} + \frac{'{1}'}{'{2}'} + \frac{'{1}'}{'{3}'} + \frac{'{1}'}{'{4}'} + \cdots" />
+  <p>Consider adding up the fractions <Tex tex={String.raw`\frac{1}{1} + \frac{1}{2} + \frac{1}{3} + \frac{1}{4} + \cdots`} />
   This is the <em>harmonic series</em>. Each term gets smaller, but the sum grows
   without bound — it eventually exceeds any number you can name!</p>
 
@@ -86,7 +86,7 @@
     </div>
 
     <p class="sum-display">
-      <Tex tex="\sum 1/n^{'{' + (sValue === Math.round(sValue) ? sValue : sValue.toFixed(2)) + '}'}" /> ≈ <strong>{sSum}</strong>
+      <Tex tex={`\\sum 1/n^{${sValue === Math.round(sValue) ? sValue : sValue.toFixed(2)}}`} /> ≈ <strong>{sSum}</strong>
       {#if sValue < 1.1}
         <span class="note explosion">Exploding!</span>
       {:else if sValue < 1.5}
@@ -105,7 +105,7 @@
   <p>Here's Euler's astonishing discovery. The sum over <em>all</em> numbers can be rewritten
   as a <em>product</em> over just the primes:</p>
 
-  <Tex display tex="\sum_{'n=1'}^{'{\\infty}'} \frac{'{1}'}{'{n^s}'} = \prod_{'p \\text{ prime}'} \frac{'{1}'}{'{1 - p^{-s}}'}" />
+  <Tex display tex={String.raw`\sum_{n=1}^{\infty} \frac{1}{n^s} = \prod_{p \text{ prime}} \frac{1}{1 - p^{-s}}`} />
 
   <p>This works because every number has a unique prime factorization. When you expand
   the product, you generate every number exactly once!</p>
@@ -122,11 +122,11 @@
   <p>Now we combine our two ideas. Instead of summing <Tex tex="1/n^s" />,
   we weight each term by a character value <Tex tex="\chi(n)" />:</p>
 
-  <Tex display tex="L(s, \chi) = \sum_{'n=1'}^{'{\\infty}'} \frac{'{\\chi(n)}'}{'{n^s}'}" />
+  <Tex display tex={String.raw`L(s, \chi) = \sum_{n=1}^{\infty} \frac{\chi(n)}{n^s}`} />
 
   <p>Because characters are multiplicative, the Euler product still works:</p>
 
-  <Tex display tex="L(s, \chi) = \prod_{'p'} \frac{'{1}'}{'{1 - \\chi(p) \\, p^{-s}}'}" />
+  <Tex display tex={String.raw`L(s, \chi) = \prod_{p} \frac{1}{1 - \chi(p) \, p^{-s}}`} />
 
   <p>The crucial difference: for the <strong>principal character</strong> <Tex tex="\chi_0" />
   (which assigns 1 to everything coprime to <Tex tex="q" />), the L-function is essentially
@@ -142,7 +142,7 @@
 
   <Callout type="insight">
     <p><strong>The key formula:</strong> Using the character filter from the last section:</p>
-    <Tex display tex="\sum_{'\\substack{p \\equiv a \\pmod{q}}'} \frac{'{1}'}{'{p^s}'} = \frac{'{1}'}{'{\\varphi(q)}'} \sum_\chi \overline{'{\\chi(a)}'} \log L(s, \chi) + O(1)" />
+    <Tex display tex={String.raw`\sum_{\substack{p \equiv a \pmod{q}}} \frac{1}{p^s} = \frac{1}{\varphi(q)} \sum_\chi \overline{\chi(a)} \log L(s, \chi) + O(1)`} />
     <p>As <Tex tex="s \to 1" />, the principal term <Tex tex="\log L(s, \chi_0)" /> diverges (heads to infinity).
     The other terms stay bounded <strong>as long as <Tex tex="L(1, \chi) \neq 0" /></strong>.
     So the whole sum diverges — meaning infinitely many primes in every coprime column!</p>
