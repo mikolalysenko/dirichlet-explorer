@@ -5,6 +5,7 @@
   import CharacterTable from '../components/viz/CharacterTable.svelte';
   import CharacterPhasors from '../components/viz/CharacterPhasors.svelte';
   import OrthogonalityViz from '../components/viz/OrthogonalityViz.svelte';
+  import OrthogonalityAnimated from '../components/viz/OrthogonalityAnimated.svelte';
   import Slider from '../components/ui/Slider.svelte';
   import { coprimeResidues, totient } from '../lib/math-utils.js';
 
@@ -103,6 +104,19 @@
     Only the target residue <Tex tex="a = {targetResidue}" /> gets a nonzero result!</p>
 
     <OrthogonalityViz {q} {targetResidue} />
+  </div>
+
+  <h3>The inner product — step by step</h3>
+
+  <p>To really see orthogonality in action, pick any two characters and watch their
+  <strong>inner product</strong> build up term by term. For each coprime residue <Tex tex="r" />,
+  we multiply one character's value by the conjugate of the other, then accumulate.
+  If the characters are the same, the arrows all point right and sum to 1.
+  If they're different, the arrows spiral around and cancel to 0.</p>
+
+  <div class="viz-container">
+    <h4>Animated inner product</h4>
+    <OrthogonalityAnimated {q} />
   </div>
 
   <Callout type="insight">
