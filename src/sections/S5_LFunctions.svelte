@@ -5,6 +5,7 @@
   import Slider from '../components/ui/Slider.svelte';
   import LFunctionPlot from '../components/viz/LFunctionPlot.svelte';
   import EulerProductViz from '../components/viz/EulerProductViz.svelte';
+  import EulerSieveViz from '../components/viz/EulerSieveViz.svelte';
   import { zetaPartial } from '../lib/lfunctions.js';
   import { listPrimes } from '../lib/primes.js';
 
@@ -114,16 +115,59 @@
 
   <h3>Euler's miracle: sums equal products</h3>
 
-  <p>Here's Euler's astonishing discovery. The sum over <em>all</em> numbers can be rewritten
-  as a <em>product</em> over just the primes:</p>
+  <p>Here's Euler's astonishing discovery from 1737. The sum over <em>all</em> numbers can be rewritten
+  as a <em>product</em> over just the <em>primes</em>:</p>
 
   <Tex display tex={String.raw`\sum_{n=1}^{\infty} \frac{1}{n^s} = \prod_{p \text{ prime}} \frac{1}{1 - p^{-s}}`} />
 
-  <p>This works because every number has a unique prime factorization. When you expand
-  the product, you generate every number exactly once!</p>
+  <p>This is remarkable — the left side adds up a term for every integer, while the right
+  side only involves primes. Why are they equal? Let's prove it step by step.</p>
+
+  <h4>Step 1: A geometric series for each prime</h4>
+
+  <p>Remember the geometric series formula: <Tex tex={String.raw`1 + r + r^2 + r^3 + \cdots = \frac{1}{1-r}`} /> when <Tex tex="|r| < 1" />.
+  For a prime <Tex tex="p" />, plugging in <Tex tex={String.raw`r = 1/p^s`} /> gives:</p>
+
+  <Tex display tex={String.raw`\frac{1}{1 - p^{-s}} = 1 + \frac{1}{p^s} + \frac{1}{p^{2s}} + \frac{1}{p^{3s}} + \cdots`} />
+
+  <p>Each factor on the right side of the Euler product is an infinite sum over powers of one prime.</p>
+
+  <h4>Step 2: Multiply two geometric series</h4>
+
+  <p>Now multiply the series for <Tex tex="p = 2" /> and <Tex tex="p = 3" />:</p>
+
+  <Tex display tex={String.raw`\left(1 + \frac{1}{2^s} + \frac{1}{4^s} + \frac{1}{8^s} + \cdots\right)\left(1 + \frac{1}{3^s} + \frac{1}{9^s} + \frac{1}{27^s} + \cdots\right)`} />
+
+  <p>When you expand this product, each term picks one power of 2 and one power of 3, giving
+  <Tex tex={String.raw`\frac{1}{(2^a \cdot 3^b)^s}`} /> for every choice of <Tex tex={String.raw`a \ge 0, b \ge 0`} />.
+  The numbers <Tex tex={String.raw`2^a \cdot 3^b`} /> are exactly the integers whose only prime factors
+  are 2 and 3: <span class="number">1, 2, 3, 4, 6, 8, 9, 12, 16, 18, 24, 27, ...</span></p>
+
+  <p>Crucially, each integer appears <strong>exactly once</strong>, because the exponents <Tex tex="(a, b)" /> are unique — this is the fundamental theorem of arithmetic!</p>
+
+  <h4>Step 3: Keep multiplying — every integer appears</h4>
+
+  <p>Each new prime you multiply in generates all the integers that use that prime as a factor.
+  After including all primes, every positive integer is generated exactly once.
+  Use the buttons below to add primes one at a time and watch the grid fill up:</p>
 
   <div class="viz-container">
-    <h4>The Euler product — each prime contributes a factor</h4>
+    <h4>The Euler sieve — adding primes one by one</h4>
+    <Slider label="s" bind:value={eulerS} min={1.2} max={4} step={0.1} format={v => v.toFixed(1)} />
+    <EulerSieveViz s={eulerS} maxN={36} />
+  </div>
+
+  <Callout type="insight">
+    <p><strong>Why this matters:</strong> The Euler product rewrites a sum over <em>all integers</em>
+    as a product over <em>just the primes</em>. This means the primes completely control the sum.
+    If you understand the primes, you understand <Tex tex={String.raw`\zeta(s)`} />.
+    Taking logarithms gives <Tex tex={String.raw`\log \zeta(s) \approx \sum_p 1/p^s`} /> —
+    a direct link between the behavior of zeta near <Tex tex="s = 1" /> and the
+    distribution of primes.</p>
+  </Callout>
+
+  <div class="viz-container">
+    <h4>Each prime's contribution to the product</h4>
     <Slider label="s" bind:value={eulerS} min={1.2} max={4} step={0.1} format={v => v.toFixed(1)} />
     <Slider label="# primes" bind:value={eulerPrimes} min={1} max={10} />
     <EulerProductViz s={eulerS} numPrimes={eulerPrimes} />
