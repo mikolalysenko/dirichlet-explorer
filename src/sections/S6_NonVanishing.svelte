@@ -549,48 +549,42 @@
   <Tex tex={String.raw`\chi = \overline{\chi}`} />, so a zero gives only <em>one</em> zero against
   the one pole. The counting argument doesn't work. We need a completely different idea.</p>
 
-  <h4>A new product with a hidden time bomb</h4>
+  <h4>A series that can only count up</h4>
 
   <p>Consider just <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> for a real character.
-  This product has a special property: <strong>every coefficient in its series expansion
-  is non-negative</strong>. Why? Look at the Euler product factors:</p>
+  When you expand this as a series <Tex tex={String.raw`\sum a_n/n^s`} />, something special happens:
+  <strong>every coefficient <Tex tex={String.raw`a_n`} /> is non-negative</strong>.</p>
 
-  <p>To see why, look at what happens at each prime in the Euler product.
-  A real character assigns <Tex tex={String.raw`\chi(p) = +1`} /> or <Tex tex={String.raw`\chi(p) = -1`} />
-  to each prime. The factor from <Tex tex={String.raw`\zeta(s)`} /> is <Tex tex={String.raw`\frac{1}{1 - p^{-s}}`} />
-  and from <Tex tex={String.raw`L(s,\chi)`} /> is <Tex tex={String.raw`\frac{1}{1 - \chi(p) p^{-s}}`} />.
-  Multiply them:</p>
+  <p>Why? A real character assigns +1 or −1 to each prime. At a "+1 prime," the two Euler factors
+  combine into a perfect square: <Tex tex={String.raw`\frac{1}{(1-p^{-s})^2}`} />.
+  At a "−1 prime," they combine into <Tex tex={String.raw`\frac{1}{1-p^{-2s}}`} />.
+  Both are geometric series with all non-negative terms. Products of non-negative series
+  stay non-negative.</p>
 
-  {#if realChar && eulerFactors.length > 0}
+  {#if realChar}
     <div class="viz-container">
-      <h4>Euler factors of ζ(s)·L(s, {realChar.label}) at each prime</h4>
-      <div class="euler-factor-list">
-        {#each eulerFactors.slice(0, 6) as f}
-          <div class="euler-factor-card" class:plus={f.chiP === 1} class:minus={f.chiP === -1}>
-            <div class="ef-header">
-              <span class="ef-prime">p = {f.p}</span>
-              <span class="ef-chi">{realChar.label}({f.p}) = {f.chiP > 0 ? '+1' : '−1'}</span>
-            </div>
-            <div class="ef-formula">
-              {#if f.chiP === 1}
-                <Tex tex={String.raw`\frac{1}{(1-p^{-s})^2}`} /> = (1 + x + x² + ...)²
-              {:else}
-                <Tex tex={String.raw`\frac{1}{1-p^{-2s}}`} /> = 1 + x² + x⁴ + ...
-              {/if}
-            </div>
-            <div class="ef-terms">
-              {#each f.terms as t}
-                <span class="ef-term">+{t.label}</span>
-              {/each}
-              <span class="ef-term muted">+ ···</span>
-            </div>
-            <div class="ef-verdict">All terms <strong>≥ 0</strong> ✓</div>
+      <h4>The coefficients of ζ(s)·L(s, {realChar.label}) — all non-negative</h4>
+      <div class="coeff-grid">
+        {#each Array(20) as _, i}
+          {@const n = i + 1}
+          {@const an = (() => {
+            let dchi = 0;
+            for (let d = 1; d <= n; d++) {
+              if (n % d === 0) {
+                const chiD = realChar.values.get(d % q)?.[0] ?? 0;
+                dchi += chiD;
+              }
+            }
+            return dchi;
+          })()}
+          <div class="coeff-cell" class:zero={an === 0}>
+            <span class="coeff-n">a<sub>{n}</sub></span>
+            <span class="coeff-val">{an}</span>
           </div>
         {/each}
       </div>
-      <p class="ef-conclusion">Every prime's factor has only non-negative terms. When you multiply
-      them all together, the result <Tex tex={String.raw`\sum a_n / n^s`} /> also has all
-      <Tex tex={String.raw`a_n \ge 0`} />. This is the key property that sets the trap.</p>
+      <p class="ef-conclusion">Every coefficient is ≥ 0. The partial sums can only grow — they
+      never decrease. This is the property that Landau's theorem exploits.</p>
     </div>
   {/if}
 
@@ -971,6 +965,46 @@
     color: var(--color-text-muted);
     text-align: center;
   }
+
+  .coeff-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3em;
+    justify-content: center;
+    margin: 0.5em 0;
+  }
+
+  .coeff-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 38px;
+    padding: 0.25em 0;
+    border-radius: 6px;
+    background: var(--color-accent-light);
+    border: 1px solid var(--color-accent);
+  }
+
+  .coeff-cell.zero {
+    background: var(--color-bg-alt);
+    border-color: var(--color-border-light);
+    opacity: 0.5;
+  }
+
+  .coeff-n {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
+  }
+
+  .coeff-val {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-accent);
+  }
+
+  .coeff-cell.zero .coeff-val { color: var(--color-text-light); }
 
   .landau-controls {
     display: flex;
