@@ -145,87 +145,86 @@
     return `f(s) ~ 1/(s−1)${supDigitsLocal[-exp]}`;
   }
 
-  // ── Visualization 2: Real character — ζ(s)L(s,χ) divergence ──
-  // Compute ζ(s)*L(s,χ_real) via partial sums with non-negative coefficients
+  // ── Visualization 2: Real character — two scenarios ─────────
   import { zetaPartial } from '../lib/lfunctions.js';
   import { gcd } from '../lib/math-utils.js';
 
-  // Find the real non-principal character (if any)
   $: realCharIdx = characters.findIndex(c => {
     if (c.isPrincipal) return false;
     const vals = [...c.values.values()];
     return vals.every(v => Math.abs(v[1]) < 0.01);
   });
 
-  // Compute ζ(s)*L(s,χ) for the real character via direct product
-  $: realProdCurve = (() => {
-    const chi = realCharIdx >= 0 ? characters[realCharIdx] : null;
-    if (!chi) return [];
-    const pts = [];
-    for (let i = 0; i <= 100; i++) {
-      const s = 0.55 + (i / 100) * 3.45; // 0.55 to 4
-      // Compute sum of d_chi(n)/n^s where d_chi(n) = sum_{d|n} chi(d)
-      // This equals ζ(s)*L(s,chi) and has non-negative coefficients
-      let sum = 0;
-      const N = 2000;
-      for (let n = 1; n <= N; n++) {
-        // d_chi(n) = sum of chi(d) for d dividing n
-        let dchi = 0;
-        for (let d = 1; d * d <= n; d++) {
-          if (n % d === 0) {
-            const chiD = chi.values.get(d % q) || [0, 0];
-            dchi += chiD[0];
-            if (d !== n / d) {
-              const chiD2 = chi.values.get((n / d) % q) || [0, 0];
-              dchi += chiD2[0];
-            }
-          }
-        }
-        sum += dchi * Math.pow(n, -s);
-      }
-      pts.push({ s, value: sum });
-    }
-    return pts;
-  })();
-
-  // Partial sums for the lower bound: just Σ 1/m^{2s} for coprime m
-  $: lowerBoundCurve = (() => {
-    const pts = [];
-    for (let i = 0; i <= 100; i++) {
-      const s = 0.55 + (i / 100) * 3.45;
-      let sum = 0;
-      for (let m = 1; m <= 500; m++) {
-        if (gcd(m, q) === 1) sum += Math.pow(m, -2 * s);
-      }
-      pts.push({ s, value: sum });
-    }
-    return pts;
-  })();
-
-  const rPlotW = 550;
-  const rPlotH = 240;
-  const rM = { left: 50, right: 15, top: 15, bottom: 35 };
-  const rPW = rPlotW - rM.left - rM.right;
-  const rPH = rPlotH - rM.top - rM.bottom;
-
   let realS = 1.5;
 
-  $: rXScale = (s) => rM.left + ((s - 0.5) / 3.5) * rPW;
+  // Compute ζ(s)·L(s,χ) and the lower bound Σ 1/m^{2s} at sampled points
+  // Use simple multiplication: zetaPartial * lFunction
+  $: realCurveData = (() => {
+    const chi = realCharIdx >= 0 ? characters[realCharIdx] : null;
+    if (!chi) return { reality: [], hypothetical: [], lowerBound: [] };
+
+    const reality = []; // ζ(s)·L(s,χ) for s > 1 (has pole)
+    const hypothetical = []; // same function but extended past s=1 (if pole cancelled)
+    const lowerBound = []; // Σ 1/m^{2s} for coprime m
+
+    for (let i = 0; i <= 150; i++) {
+      const s = 0.52 + (i / 150) * 3.48;
+      const zeta = zetaPartial(Math.max(s, 1.001), 3000);
+      const l = lFunction(Math.max(s, 1.001), chi, 2000)[0];
+      const prod = zeta * l;
+
+      // Lower bound
+      let lb = 0;
+      for (let m = 1; m <= 300; m++) {
+        if (gcd(m, q) === 1) lb += Math.pow(m, -2 * s);
+      }
+
+      if (s > 1.01) reality.push({ s, value: prod });
+      hypothetical.push({ s, value: s > 1.01 ? prod : lb * 1.1 }); // approximate extension
+      lowerBound.push({ s, value: lb });
+    }
+    return { reality, hypothetical, lowerBound };
+  })();
+
+  const rW = 280;
+  const rH = 200;
+  const rM = { left: 40, right: 10, top: 12, bottom: 30 };
+  const rPW = rW - rM.left - rM.right;
+  const rPH = rH - rM.top - rM.bottom;
+
+  $: rXScale = (s) => rM.left + ((s - 0.4) / 3.6) * rPW;
+
+  // Adaptive y-axis based on current s
   $: rYMax = (() => {
-    const atS = realProdCurve.find(p => Math.abs(p.s - Math.max(realS, 0.55)) < 0.04);
-    return Math.max(5, (atS ? atS.value : 5) * 1.3);
+    const lb = realCurveData.lowerBound.find(p => Math.abs(p.s - Math.max(realS, 0.52)) < 0.03);
+    const rv = realCurveData.reality.find(p => Math.abs(p.s - Math.max(realS, 1.02)) < 0.03);
+    return Math.max(8, Math.max(lb ? lb.value : 5, rv ? rv.value : 5) * 1.3);
   })();
-  $: rYScale = (v) => rM.top + rPH - (Math.min(v, rYMax) / rYMax) * rPH;
+  $: rYScale = (v) => rM.top + rPH - (v / rYMax) * rPH;
 
-  $: realProdPath = realProdCurve.map((p, i) => `${i === 0 ? 'M' : 'L'}${rXScale(p.s)},${rYScale(p.value)}`).join(' ');
-  $: lowerBoundPath = lowerBoundCurve.map((p, i) => `${i === 0 ? 'M' : 'L'}${rXScale(p.s)},${rYScale(p.value)}`).join(' ');
+  function rPath(pts) {
+    // Split at large values to avoid asymptote lines
+    const segs = [];
+    let cur = [];
+    for (const p of pts) {
+      if (!isFinite(p.value) || p.value > rYMax * 3 || p.value < -rYMax) {
+        if (cur.length > 1) segs.push(cur);
+        cur = [];
+      } else {
+        cur.push(p);
+      }
+    }
+    if (cur.length > 1) segs.push(cur);
+    return segs.map(seg =>
+      seg.map((p, i) => `${i === 0 ? 'M' : 'L'}${rXScale(p.s)},${rYScale(p.value)}`).join(' ')
+    );
+  }
 
-  $: realCurrentVal = (() => {
-    const p = realProdCurve.find(p => Math.abs(p.s - Math.max(realS, 0.55)) < 0.04);
-    return p ? p.value : 0;
-  })();
-  $: lowerCurrentVal = (() => {
-    const p = lowerBoundCurve.find(p => Math.abs(p.s - Math.max(realS, 0.55)) < 0.04);
+  $: realityPaths = rPath(realCurveData.reality);
+  $: lowerBoundPaths = rPath(realCurveData.lowerBound);
+
+  $: currentLB = (() => {
+    const p = realCurveData.lowerBound.find(p => Math.abs(p.s - Math.max(realS, 0.52)) < 0.03);
     return p ? p.value : 0;
   })();
 </script>
@@ -444,88 +443,115 @@
 
   <h3>The subtle case: real characters</h3>
 
-  <p>A <strong>real character</strong> equals its own conjugate (<Tex tex={String.raw`\chi = \overline{\chi}`} />),
-  so a zero would only count once — exactly matching the one pole.
-  The product argument alone isn't enough!</p>
+  <p>Try setting 1 pole and 1 zero in the playground above. They cancel — the product
+  stays finite. No contradiction! A <strong>real character</strong> equals its own conjugate
+  (<Tex tex={String.raw`\chi = \overline{\chi}`} />), so a zero gives only <em>one</em> zero, not two.
+  We need a different argument.</p>
 
-  <p>Dirichlet needed a subtler idea. Consider just <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} />
-  for a real character <Tex tex="\chi" />. This product also has non-negative coefficients
-  (because for a real character, each prime contributes either <Tex tex={String.raw`(1-p^{-s})^{-2}`} /> if
-  <Tex tex={String.raw`\chi(p)=1`} />, or <Tex tex={String.raw`(1-p^{-2s})^{-1}`} /> if
-  <Tex tex={String.raw`\chi(p)=-1`} /> — both have non-negative series expansions).</p>
+  <h4>Step 1: A new product with non-negative coefficients</h4>
 
-  <p>If <Tex tex="L(1, \chi) = 0" />, the zero would cancel the pole from <Tex tex="\zeta" />,
-  making the product analytic (well-behaved with no singularities) for all <Tex tex="s > 0" />.
-  There is a theorem called <strong>Landau's theorem</strong> that says: a Dirichlet series with
-  non-negative coefficients must have a singularity at the boundary of its region of convergence.
-  If the product is analytic for all <Tex tex="s > 0" />, then the series would have to converge for
-  all <Tex tex="s > 0" />.</p>
+  <p>Consider just <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> for a real character.
+  At each prime in the Euler product, this gives either:</p>
 
-  <p>But the non-negative coefficients include terms <Tex tex={String.raw`1/m^{2s}`} /> for every
-  integer <Tex tex="m" /> coprime to <Tex tex="q" />.
-  As <Tex tex={String.raw`s \to 1/2`} />, the sum <Tex tex={String.raw`\sum 1/m^{2s} \to \sum 1/m = \infty`} />.
-  Drag the slider below to see it:</p>
+  <ul class="real-cases">
+    <li>If <Tex tex={String.raw`\chi(p) = +1`} />: the factor is
+    <Tex tex={String.raw`\frac{1}{(1-p^{-s})^2}`} /> — a <em>squared</em> geometric series (all terms positive)</li>
+    <li>If <Tex tex={String.raw`\chi(p) = -1`} />: the factor is
+    <Tex tex={String.raw`\frac{1}{1-p^{-2s}}`} /> — a geometric series in <Tex tex={String.raw`p^{-2s}`} /> (also all positive)</li>
+  </ul>
+
+  <p>So this product, written as <Tex tex={String.raw`\sum a_n / n^s`} />, has all
+  <Tex tex={String.raw`a_n \ge 0`} />. This is the key property.</p>
+
+  <h4>Step 2: The trap</h4>
+
+  <p>Normally, <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> has a pole at <Tex tex="s = 1" />
+  (from <Tex tex={String.raw`\zeta`} />). The series <Tex tex={String.raw`\sum a_n/n^s`} /> converges for
+  <Tex tex="s > 1" /> and diverges at <Tex tex="s = 1" />. That's fine — the pole is the boundary.</p>
+
+  <p>But <strong>if <Tex tex="L(1, \chi) = 0" /></strong>, the zero would cancel the pole.
+  The function would be smooth (no singularity) for all <Tex tex="s > 0" />.
+  <strong>Landau's theorem</strong> says: a Dirichlet series with non-negative coefficients can only
+  stop converging at a singularity. No singularity → the series converges for <em>all</em> <Tex tex="s > 0" />.</p>
+
+  <h4>Step 3: The explosion at s = ½</h4>
+
+  <p>But wait — the non-negative coefficients include <Tex tex={String.raw`1/m^{2s}`} /> for every
+  coprime <Tex tex="m" />. At <Tex tex="s = 1/2" />, this becomes
+  <Tex tex={String.raw`\sum 1/m`} /> — the harmonic series, which diverges!
+  Drag <Tex tex="s" /> toward ½ to see it blow up:</p>
 
   {#if realCharIdx >= 0}
     <div class="viz-container">
-      <h4>ζ(s)·L(s, {characters[realCharIdx]?.label}) — diverges at s = 1/2</h4>
-      <Slider label="s" bind:value={realS} min={0.55} max={3} step={0.01} format={v => v.toFixed(2)} />
+      <h4>The lower bound Σ 1/m²ˢ explodes at s = ½</h4>
+      <Slider label="s" bind:value={realS} min={0.52} max={3} step={0.01} format={v => v.toFixed(2)} />
 
-      <svg viewBox="0 0 {rPlotW} {rPlotH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
-        <defs>
-          <clipPath id="r-clip"><rect x={rM.left} y={rM.top} width={rPW} height={rPH} /></clipPath>
-        </defs>
+      <div class="real-plots">
+        <!-- Left: Reality (pole at s=1) -->
+        <div class="real-plot-panel">
+          <div class="real-plot-label">Reality: pole at s=1</div>
+          <svg viewBox="0 0 {rW} {rH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
+            <defs><clipPath id="r-clip-l"><rect x={rM.left} y={rM.top} width={rPW} height={rPH} /></clipPath></defs>
+            <line x1={rXScale(1)} y1={rM.top} x2={rXScale(1)} y2={rM.top + rPH} stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="3,3" opacity="0.5" />
+            <text x={rXScale(1)} y={rH - rM.bottom + 14} text-anchor="middle" font-size="7" font-family="var(--font-mono)" fill="var(--color-prime)">s=1 (pole)</text>
+            <line x1={rM.left} y1={rM.top + rPH} x2={rW - rM.right} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
+            <line x1={rM.left} y1={rM.top} x2={rM.left} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
+            <g clip-path="url(#r-clip-l)">
+              {#each realityPaths as path}
+                <path d={path} fill="none" stroke="var(--color-accent)" stroke-width="2" />
+              {/each}
+            </g>
+            <text x={rW / 2} y={rM.top + 14} text-anchor="middle" font-size="8" fill="var(--color-text-muted)">
+              ζ(s)·L(s,χ) — converges for s {'>'} 1
+            </text>
+          </svg>
+        </div>
 
-        <!-- s=1 and s=1/2 markers -->
-        <line x1={rXScale(1)} y1={rM.top} x2={rXScale(1)} y2={rM.top + rPH}
-          stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3,3" opacity="0.4" />
-        <text x={rXScale(1)} y={rM.top - 4} text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">s=1</text>
-
-        <line x1={rXScale(0.5)} y1={rM.top} x2={rXScale(0.5)} y2={rM.top + rPH}
-          stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
-        <text x={rXScale(0.5)} y={rM.top - 4} text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="#ef4444" font-weight="600">s=½ (diverges!)</text>
-
-        <!-- Axes -->
-        <line x1={rM.left} y1={rM.top} x2={rM.left} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
-        <line x1={rM.left} y1={rM.top + rPH} x2={rPlotW - rM.right} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
-        <text x={rPlotW / 2} y={rPlotH - 4} text-anchor="middle" font-size="10" fill="var(--color-text-muted)">s</text>
-
-        <g clip-path="url(#r-clip)">
-          <!-- Lower bound: Σ 1/m^{2s} (dashed) -->
-          <path d={lowerBoundPath} fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.5" />
-
-          <!-- ζ(s)·L(s,χ) curve -->
-          <path d={realProdPath} fill="none" stroke="var(--color-accent)" stroke-width="2.5" />
-        </g>
-
-        <!-- Current s marker -->
-        <line x1={rXScale(realS)} y1={rM.top} x2={rXScale(realS)} y2={rM.top + rPH}
-          stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
-
-        <!-- Value dot -->
-        {#if realCurrentVal < rYMax}
-          <circle cx={rXScale(realS)} cy={rYScale(realCurrentVal)} r="5" fill="var(--color-accent)" stroke="white" stroke-width="2" />
-        {/if}
-      </svg>
+        <!-- Right: Hypothetical (if L(1,χ)=0, pole cancelled) -->
+        <div class="real-plot-panel">
+          <div class="real-plot-label" style="color: #ef4444">If L(1,χ) = 0: no pole</div>
+          <svg viewBox="0 0 {rW} {rH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
+            <defs><clipPath id="r-clip-r"><rect x={rM.left} y={rM.top} width={rPW} height={rPH} /></clipPath></defs>
+            <!-- s=1/2 danger zone -->
+            <rect x={rM.left} y={rM.top} width={rXScale(0.5) - rM.left} height={rPH} fill="#ef4444" opacity="0.04" />
+            <line x1={rXScale(0.5)} y1={rM.top} x2={rXScale(0.5)} y2={rM.top + rPH} stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.7" />
+            <text x={rXScale(0.5)} y={rH - rM.bottom + 14} text-anchor="middle" font-size="7" font-family="var(--font-mono)" fill="#ef4444" font-weight="600">s=½ → ∞!</text>
+            <line x1={rXScale(1)} y1={rM.top} x2={rXScale(1)} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.3" />
+            <line x1={rM.left} y1={rM.top + rPH} x2={rW - rM.right} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
+            <line x1={rM.left} y1={rM.top} x2={rM.left} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
+            <g clip-path="url(#r-clip-r)">
+              {#each lowerBoundPaths as path}
+                <path d={path} fill="none" stroke="#ef4444" stroke-width="2" />
+              {/each}
+            </g>
+            <!-- Current s marker -->
+            <line x1={rXScale(realS)} y1={rM.top} x2={rXScale(realS)} y2={rM.top + rPH} stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
+            {#if currentLB < rYMax}
+              <circle cx={rXScale(realS)} cy={rYScale(currentLB)} r="4" fill="#ef4444" stroke="white" stroke-width="1.5" />
+            {/if}
+            <text x={rW / 2} y={rM.top + 14} text-anchor="middle" font-size="8" fill="#ef4444">
+              "should converge" but Σ1/m²ˢ → ∞
+            </text>
+          </svg>
+        </div>
+      </div>
 
       <div class="contradiction-readout">
-        <span class="c-item" style="color: var(--color-accent)">ζ(s)·L(s,χ) = <strong>{realCurrentVal > 10000 ? '∞' : realCurrentVal.toFixed(2)}</strong></span>
-        <span class="c-item" style="color: #ef4444">lower bound Σ1/m²ˢ = {lowerCurrentVal > 10000 ? '∞' : lowerCurrentVal.toFixed(2)}
-          {#if realS < 0.7}
-            <span class="c-tag violation">exploding → contradiction!</span>
+        <span class="c-item" style="color: #ef4444">
+          Σ 1/m²ˢ at s={realS.toFixed(2)}: <strong>{currentLB > 10000 ? '∞' : currentLB.toFixed(1)}</strong>
+          {#if realS < 0.65}
+            <span class="c-tag violation">diverging → contradiction!</span>
           {/if}
         </span>
       </div>
     </div>
   {/if}
 
-  <p>A convergent series can't sum to infinity — <strong>contradiction!</strong></p>
-
   <Callout>
-    <p><strong>In short:</strong> If <Tex tex="L(1, \chi) = 0" /> for a real character, then
-    <Tex tex={String.raw`\zeta(s) L(s, \chi)`} /> would be analytic everywhere for <Tex tex="s > 0" />
-    (Landau's theorem would force convergence there), but the series provably diverges
-    at <Tex tex="s = 1/2" />. That's a contradiction.
+    <p><strong>The contradiction:</strong> If <Tex tex="L(1, \chi) = 0" />, Landau's theorem forces
+    <Tex tex={String.raw`\sum a_n/n^s`} /> to converge for all <Tex tex="s > 0" />. But the lower bound
+    <Tex tex={String.raw`\sum 1/m^{2s}`} /> diverges at <Tex tex="s = 1/2" />. A convergent series can't
+    have a divergent subseries. <strong>Contradiction!</strong>
     So <Tex tex="L(1, \chi) \neq 0" /> for real characters too.</p>
   </Callout>
 
@@ -652,6 +678,31 @@
 
   .c-tag.pole { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
   .c-tag.violation { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+  .real-cases { margin: 0.5em 0 0.5em 1.5em; font-size: 0.95rem; }
+  .real-cases li { margin-bottom: 0.3em; }
+
+  .real-plots {
+    display: flex;
+    gap: 1em;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 0.5em 0;
+  }
+
+  .real-plot-panel {
+    flex: 1;
+    min-width: 250px;
+    max-width: 320px;
+  }
+
+  .real-plot-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 0.2em;
+    color: var(--color-text-muted);
+  }
 
   .pz-controls {
     display: flex;
