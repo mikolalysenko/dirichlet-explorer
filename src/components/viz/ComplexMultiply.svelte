@@ -1,24 +1,31 @@
 <script>
+  import { onMount } from 'svelte';
+
   const size = 180;
   const cx = size / 2;
   const cy = size / 2;
   const R = size / 2 - 24;
+  const gap = 20;
+  const totalW = size * 3 + gap * 2;
+  const totalH = size + 50;
 
-  // Two input complex numbers (angles in radians)
-  let angleA = Math.PI / 3;   // 60°
-  let angleB = Math.PI / 4;   // 45°
+  // Circle centers in SVG coordinates
+  const centers = [
+    { x: cx, y: cy },                     // a
+    { x: size + gap + cx, y: cy },         // b
+    { x: 2 * (size + gap) + cx, y: cy },   // product
+  ];
+
+  let angleA = Math.PI / 3;
+  let angleB = Math.PI / 4;
   let conjugateA = false;
   let conjugateB = false;
 
-  // Dragging state
-  let dragging = null; // 'a' or 'b'
+  $: aRe = Math.cos(conjugateA ? -angleA : angleA);
+  $: aIm = Math.sin(conjugateA ? -angleA : angleA);
+  $: bRe = Math.cos(conjugateB ? -angleB : angleB);
+  $: bIm = Math.sin(conjugateB ? -angleB : angleB);
 
-  $: aRe = Math.cos(angleA) * (conjugateA ? 1 : 1);
-  $: aIm = Math.sin(angleA) * (conjugateA ? -1 : 1);
-  $: bRe = Math.cos(angleB) * (conjugateB ? 1 : 1);
-  $: bIm = Math.sin(angleB) * (conjugateB ? -1 : 1);
-
-  // Product: (aRe + aIm*i) * (bRe + bIm*i)
   $: pRe = aRe * bRe - aIm * bIm;
   $: pIm = aRe * bIm + aIm * bRe;
 
@@ -41,151 +48,142 @@
     return `${r}${sign}${iStr}i`;
   }
 
-  function startDrag(which, e) {
-    dragging = which;
-    handleDrag(e);
+  // Drag state
+  let dragging = null; // 'a' | 'b' | null
+  let svgEl;
+
+  function svgPoint(clientX, clientY) {
+    if (!svgEl) return { x: 0, y: 0 };
+    const pt = svgEl.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const ctm = svgEl.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const svgPt = pt.matrixTransform(ctm.inverse());
+    return { x: svgPt.x, y: svgPt.y };
   }
 
-  function handleDrag(e) {
+  function updateAngle(clientX, clientY) {
     if (!dragging) return;
-    const svg = e.currentTarget.closest ? e.currentTarget.closest('svg') : e.target.closest('svg');
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    // Determine which circle we're in based on dragging target
-    const circleIdx = dragging === 'a' ? 0 : dragging === 'b' ? 1 : -1;
-    if (circleIdx < 0) return;
-    // Each circle's center in viewport coords
-    const svgW = rect.width;
-    const totalW = size * 3 + 40; // 3 circles + gaps
-    const scale = svgW / totalW;
-    const circleCxPx = rect.left + (circleIdx * (size + 20) + cx) * scale;
-    const circleCyPx = rect.top + cy * scale;
-    const dx = e.clientX - circleCxPx;
-    const dy = e.clientY - circleCyPx;
-    const angle = Math.atan2(-dy, dx); // SVG y is flipped
+    const pt = svgPoint(clientX, clientY);
+    const idx = dragging === 'a' ? 0 : 1;
+    const dx = pt.x - centers[idx].x;
+    const dy = -(pt.y - centers[idx].y); // SVG y is flipped vs math
+    const angle = Math.atan2(dy, dx);
     if (dragging === 'a') angleA = conjugateA ? -angle : angle;
-    else if (dragging === 'b') angleB = conjugateB ? -angle : angle;
+    else angleB = conjugateB ? -angle : angle;
   }
 
-  function stopDrag() {
+  function onPointerDown(which, e) {
+    dragging = which;
+    svgEl?.setPointerCapture?.(e.pointerId);
+    updateAngle(e.clientX, e.clientY);
+  }
+
+  function onPointerMove(e) {
+    if (!dragging) return;
+    e.preventDefault();
+    updateAngle(e.clientX, e.clientY);
+  }
+
+  function onPointerUp(e) {
+    if (dragging) {
+      svgEl?.releasePointerCapture?.(e.pointerId);
+    }
     dragging = null;
   }
 
-  // Handle touch
-  function handleTouch(e) {
-    if (!dragging) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    handleDrag({ clientX: touch.clientX, clientY: touch.clientY, currentTarget: e.currentTarget, target: e.target });
-  }
-
-  function drawCircle(cxOff, re, im, color, label, deg) {
-    const x = cxOff + cx;
-    const y = cy;
-    const tipX = x + re * R;
-    const tipY = y - im * R;
-    return { x, y, tipX, tipY, re, im, color, label, deg };
-  }
-
-  $: circA = drawCircle(0, aRe, aIm, '#6366f1', 'a', aDeg);
-  $: circB = drawCircle(size + 20, bRe, bIm, '#ec4899', 'b', bDeg);
-  $: circP = drawCircle(2 * (size + 20), pRe, pIm, '#14b8a6', 'a × b', pDeg);
-
-  const totalW = size * 3 + 40;
+  // Data for the three circles
+  $: circles = [
+    { re: aRe, im: aIm, color: '#6366f1', label: 'a', deg: aDeg, draggable: 'a' },
+    { re: bRe, im: bIm, color: '#ec4899', label: 'b', deg: bDeg, draggable: 'b' },
+    { re: pRe, im: pIm, color: '#14b8a6', label: 'a × b', deg: pDeg, draggable: null },
+  ];
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="complex-mul"
-  on:mousemove={handleDrag}
-  on:mouseup={stopDrag}
-  on:mouseleave={stopDrag}
-  on:touchmove={handleTouch}
-  on:touchend={stopDrag}
-  role="application"
->
-  <svg viewBox="0 0 {totalW} {size + 50}" preserveAspectRatio="xMidYMid meet" class="complex-svg">
-    {#each [circA, circB, circP] as c, i}
-      {@const isInput = i < 2}
-      {@const which = i === 0 ? 'a' : i === 1 ? 'b' : null}
+<div class="complex-mul">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <svg
+    bind:this={svgEl}
+    viewBox="0 0 {totalW} {totalH}"
+    preserveAspectRatio="xMidYMid meet"
+    class="complex-svg"
+    on:pointermove={onPointerMove}
+    on:pointerup={onPointerUp}
+    on:pointerleave={onPointerUp}
+  >
+    {#each circles as c, i}
+      {@const ctr = centers[i]}
+      {@const tipX = ctr.x + c.re * R}
+      {@const tipY = ctr.y - c.im * R}
       <g>
         <!-- Unit circle -->
-        <circle cx={c.x} cy={c.y} r={R} fill="none" stroke="var(--color-border-light)" stroke-width="0.75" />
+        <circle cx={ctr.x} cy={ctr.y} r={R} fill="none" stroke="var(--color-border-light)" stroke-width="0.75" />
         <!-- Axes -->
-        <line x1={c.x - R} y1={c.y} x2={c.x + R} y2={c.y} stroke="var(--color-border-light)" stroke-width="0.5" />
-        <line x1={c.x} y1={c.y - R} x2={c.x} y2={c.y + R} stroke="var(--color-border-light)" stroke-width="0.5" />
-        <!-- Axis labels -->
-        <text x={c.x + R + 3} y={c.y - 3} font-size="7" font-family="var(--font-mono)" fill="var(--color-text-light)">Re</text>
-        <text x={c.x + 3} y={c.y - R - 3} font-size="7" font-family="var(--font-mono)" fill="var(--color-text-light)">Im</text>
+        <line x1={ctr.x - R} y1={ctr.y} x2={ctr.x + R} y2={ctr.y} stroke="var(--color-border-light)" stroke-width="0.5" />
+        <line x1={ctr.x} y1={ctr.y - R} x2={ctr.x} y2={ctr.y + R} stroke="var(--color-border-light)" stroke-width="0.5" />
+        <text x={ctr.x + R + 3} y={ctr.y - 3} font-size="7" font-family="var(--font-mono)" fill="var(--color-text-light)">Re</text>
+        <text x={ctr.x + 3} y={ctr.y - R - 3} font-size="7" font-family="var(--font-mono)" fill="var(--color-text-light)">Im</text>
 
-        <!-- Angle arc -->
-        {#if Math.abs(c.deg) > 2}
-          {@const arcR = R * 0.3}
-          {@const startAngle = 0}
-          {@const endAngle = -Math.atan2(c.im, c.re)}
-          {@const sweep = endAngle > 0 ? 0 : 1}
-          <path
-            d="M{c.x + arcR},{c.y} A{arcR},{arcR} 0 {Math.abs(c.deg) > 180 ? 1 : 0},{sweep} {c.x + Math.cos(-endAngle) * arcR},{c.y + Math.sin(-endAngle) * arcR}"
-            fill="none" stroke={c.color} stroke-width="1" opacity="0.4"
-          />
-        {/if}
-
-        <!-- Projection lines (dotted) -->
-        <line x1={c.tipX} y1={c.tipY} x2={c.tipX} y2={c.y}
+        <!-- Projection lines -->
+        <line x1={tipX} y1={tipY} x2={tipX} y2={ctr.y}
           stroke={c.color} stroke-width="0.7" stroke-dasharray="2,2" opacity="0.35" />
-        <line x1={c.tipX} y1={c.tipY} x2={c.x} y2={c.tipY}
+        <line x1={tipX} y1={tipY} x2={ctr.x} y2={tipY}
           stroke={c.color} stroke-width="0.7" stroke-dasharray="2,2" opacity="0.35" />
 
         <!-- Arrow -->
-        <line x1={c.x} y1={c.y} x2={c.tipX} y2={c.tipY}
+        <line x1={ctr.x} y1={ctr.y} x2={tipX} y2={tipY}
           stroke={c.color} stroke-width="2.5" stroke-linecap="round" />
 
-        <!-- Draggable tip -->
-        <circle cx={c.tipX} cy={c.tipY} r={isInput ? 7 : 5}
-          fill={c.color} stroke="white" stroke-width="2"
-          style="cursor: {isInput ? 'grab' : 'default'}"
-          on:mousedown={isInput ? (e) => startDrag(which, e) : undefined}
-          on:touchstart={isInput ? (e) => { e.preventDefault(); startDrag(which, e.touches[0]); } : undefined}
-        />
+        <!-- Draggable tip (or static for product) -->
+        {#if c.draggable}
+          <circle
+            cx={tipX} cy={tipY} r="8"
+            fill={c.color} stroke="white" stroke-width="2"
+            style="cursor: grab; touch-action: none;"
+            on:pointerdown={(e) => onPointerDown(c.draggable, e)}
+          />
+        {:else}
+          <circle cx={tipX} cy={tipY} r="5"
+            fill={c.color} stroke="white" stroke-width="1.5" />
+        {/if}
 
-        <!-- Label above -->
-        <text x={c.x} y={8} text-anchor="middle" font-size="11"
+        <!-- Label -->
+        <text x={ctr.x} y={10} text-anchor="middle" font-size="11"
           font-family="var(--font-mono)" font-weight="600" fill={c.color}>
           {c.label}
         </text>
 
-        <!-- Coordinates below -->
-        <text x={c.x} y={size + 16} text-anchor="middle" font-size="9"
+        <!-- Rectangular form -->
+        <text x={ctr.x} y={size + 16} text-anchor="middle" font-size="9"
           font-family="var(--font-mono)" fill={c.color}>
           {formatComplex(c.re, c.im)}
         </text>
-        <text x={c.x} y={size + 28} text-anchor="middle" font-size="8"
+        <!-- Angle -->
+        <text x={ctr.x} y={size + 28} text-anchor="middle" font-size="8"
           font-family="var(--font-mono)" fill="var(--color-text-light)">
           {c.deg}°
         </text>
       </g>
 
-      <!-- × and = signs between circles -->
+      <!-- × and = between circles -->
       {#if i === 0}
-        <text x={size + 10} y={cy + 4} text-anchor="middle" font-size="18"
+        <text x={size + gap / 2} y={cy + 5} text-anchor="middle" font-size="18"
           font-family="var(--font-mono)" fill="var(--color-text-light)">×</text>
       {/if}
       {#if i === 1}
-        <text x={2 * size + 30} y={cy + 4} text-anchor="middle" font-size="18"
+        <text x={2 * size + gap * 1.5} y={cy + 5} text-anchor="middle" font-size="18"
           font-family="var(--font-mono)" fill="var(--color-text-light)">=</text>
       {/if}
     {/each}
 
-    <!-- Angle sum annotation -->
-    <text x={totalW / 2} y={size + 44} text-anchor="middle" font-size="9"
+    <!-- Angle sum -->
+    <text x={totalW / 2} y={totalH - 4} text-anchor="middle" font-size="9"
       font-family="var(--font-mono)" fill="var(--color-text-muted)">
-      {aDeg}° + {bDeg}° = {pDeg}°
-      {#if Math.abs((aDeg + bDeg) - pDeg) > 1 && Math.abs((aDeg + bDeg) - pDeg - 360) > 1 && Math.abs((aDeg + bDeg) - pDeg + 360) > 1}
-        (mod 360°)
-      {/if}
+      {aDeg}° + {bDeg}° = {pDeg}° {Math.abs(aDeg + bDeg - pDeg) > 1 && Math.abs(aDeg + bDeg - pDeg) < 359 ? '(mod 360°)' : ''}
     </text>
   </svg>
 
-  <!-- Conjugate toggles -->
   <div class="conj-row">
     <label class="conj-toggle">
       <input type="checkbox" bind:checked={conjugateA} />
@@ -199,10 +197,7 @@
 </div>
 
 <style>
-  .complex-mul {
-    width: 100%;
-    touch-action: none;
-  }
+  .complex-mul { width: 100%; }
 
   .complex-svg {
     width: 100%;
@@ -210,6 +205,7 @@
     max-width: 620px;
     display: block;
     margin: 0 auto;
+    touch-action: none;
   }
 
   .conj-row {
@@ -230,7 +226,5 @@
     cursor: pointer;
   }
 
-  .conj-toggle input {
-    cursor: pointer;
-  }
+  .conj-toggle input { cursor: pointer; }
 </style>
