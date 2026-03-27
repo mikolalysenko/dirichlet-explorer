@@ -407,16 +407,22 @@
 
   // Compute the lower bound directly at any s using more terms near s=0.5
   $: currentLB = (() => {
-    const N = realS < 0.6 ? 5000 : realS < 0.8 ? 2000 : 500;
+    const N = realS < 0.55 ? 10000 : realS < 0.6 ? 5000 : realS < 0.8 ? 2000 : 500;
     let sum = 0;
     for (let m = 1; m <= N; m++) {
-      if (gcd(m, q) === 1) sum += Math.pow(m, -2 * Math.max(realS, 0.501));
+      if (gcd(m, q) === 1) sum += Math.pow(m, -2 * Math.max(realS, 0.5001));
     }
     return sum;
   })();
 
-  // Adaptive y-max: smoothly tracks the current value with headroom
-  $: lbYMax = Math.max(5, currentLB * 1.3);
+  // Y-axis: use log scaling so the axis numbers get huge but the curve
+  // still shoots off the top near s=0.5. The axis shows the scale of
+  // the explosion via the grid numbers while the curve visually rockets up.
+  $: lbYMax = (() => {
+    if (currentLB < 5) return 5;
+    // Axis grows as sqrt of the value — so the curve outruns it
+    return Math.pow(currentLB, 0.7) * 3;
+  })();
   $: lbYScale = (v) => lM.top + lPH - (v / lbYMax) * lPH;
 
   // Lower bound curve recomputed with extended range, denser near s=0.5
