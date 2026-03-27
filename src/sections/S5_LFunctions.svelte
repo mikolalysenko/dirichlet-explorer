@@ -294,19 +294,8 @@
   character value <Tex tex={String.raw`\chi(p)`} /> — an arrow on the unit circle. Different
   characters weight the primes differently, and that's what lets us isolate one column.</p>
 
-  <h4>What happens at <Tex tex="s = 1" />?</h4>
-
-  <p>For the <strong>principal character</strong> <Tex tex="\chi_0" />
-  (which assigns 1 to everything coprime to <Tex tex="q" />), the L-function is essentially
-  the zeta function — it <em>blows up</em> at <Tex tex="s = 1" />.
-  (Because <Tex tex="\chi_0(n) = 1" /> for coprime <Tex tex="n" />, the sum is nearly
-  <Tex tex="\zeta(s)" />, just missing a few terms. Removing finitely many Euler factors doesn't
-  prevent the divergence.)</p>
-
-  <p>For non-principal characters, the arrows <Tex tex="\chi(n)" /> point in different directions
-  and partially cancel. Within each period of <Tex tex="q" /> consecutive integers, the character
-  values sum to zero — so the weighted sum doesn't pile up. The L-function stays
-  <strong>finite</strong> at <Tex tex="s = 1" />.</p>
+  <p>Here's what the L-functions look like for all characters mod <Tex tex="q" />.
+  Drag the <Tex tex="s" /> slider toward 1 and watch what happens:</p>
 
   <div class="viz-container">
     <h4>L-functions for all characters mod {plotQ}</h4>
@@ -314,6 +303,20 @@
     <Slider label="s" bind:value={plotS} min={1.05} max={4} step={0.05} format={v => v.toFixed(2)} />
     <LFunctionPlot q={plotQ} sValue={plotS} />
   </div>
+
+  <h4>What happens at <Tex tex="s = 1" />?</h4>
+
+  <p>The plot reveals a dramatic difference. The <strong>principal character</strong> <Tex tex="\chi_0" />
+  (which assigns 1 to everything coprime to <Tex tex="q" />) rockets upward as <Tex tex="s \to 1" /> —
+  its L-function is essentially the zeta function, so it <em>blows up</em>.
+  (Because <Tex tex="\chi_0(n) = 1" /> for coprime <Tex tex="n" />, the sum is nearly
+  <Tex tex="\zeta(s)" />, just missing a few terms. Removing finitely many Euler factors doesn't
+  prevent the divergence.)</p>
+
+  <p>But all the other curves stay calm. For non-principal characters, the arrows <Tex tex="\chi(n)" /> point in different directions
+  and partially cancel. Within each period of <Tex tex="q" /> consecutive integers, the character
+  values sum to zero — so the weighted sum doesn't pile up. The L-function stays
+  <strong>finite</strong> at <Tex tex="s = 1" />.</p>
 
   <h3>From L-functions to counting primes</h3>
 
