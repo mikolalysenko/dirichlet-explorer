@@ -309,7 +309,7 @@
   const lPW = lPlotW - lM.left - lM.right;
   const lPH = lPlotH - lM.top - lM.bottom;
 
-  $: lXScale = (s) => lM.left + ((s - 0.5) / 2.5) * lPW;
+  $: lXScale = (s) => lM.left + ((s - 0.4) / 3.1) * lPW; // s from 0.4 to 3.5
 
   $: lYMax = (() => {
     const maxVal = Math.max(...landauCurves.flatMap(c => c.pts.filter(p => p.s > 0.7).map(p => Math.abs(p.value))));
@@ -405,9 +405,49 @@
   $: realityPaths = rPath(realCurveData.reality);
   $: lowerBoundPaths = rPath(realCurveData.lowerBound);
 
+  // Compute the lower bound directly at any s (fast — just a sum)
   $: currentLB = (() => {
-    const p = realCurveData.lowerBound.find(p => Math.abs(p.s - Math.max(realS, 0.52)) < 0.03);
-    return p ? p.value : 0;
+    let sum = 0;
+    for (let m = 1; m <= 300; m++) {
+      if (gcd(m, q) === 1) sum += Math.pow(m, -2 * Math.max(realS, 0.51));
+    }
+    return sum;
+  })();
+
+  // Adaptive y-max for the lower bound chart — tracks the value at current s
+  $: lbYMax = Math.max(5, currentLB * 1.3);
+  $: lbYScale = (v) => lM.top + lPH - (v / lbYMax) * lPH;
+
+  // Lower bound curve recomputed with extended range
+  $: lbCurve = (() => {
+    const pts = [];
+    for (let i = 0; i <= 150; i++) {
+      const s = 0.51 + (i / 150) * 2.99; // 0.51 to 3.5
+      let sum = 0;
+      for (let m = 1; m <= 300; m++) {
+        if (gcd(m, q) === 1) sum += Math.pow(m, -2 * s);
+      }
+      pts.push({ s, value: sum });
+    }
+    return pts;
+  })();
+
+  // Path with segment splitting for the lower bound
+  $: lbPath = (() => {
+    const segs = [];
+    let cur = [];
+    for (const p of lbCurve) {
+      if (!isFinite(p.value) || p.value > lbYMax * 3) {
+        if (cur.length > 1) segs.push(cur);
+        cur = [];
+      } else {
+        cur.push(p);
+      }
+    }
+    if (cur.length > 1) segs.push(cur);
+    return segs.map(seg =>
+      seg.map((p, i) => `${i === 0 ? 'M' : 'L'}${lXScale(p.s)},${lbYScale(p.value)}`).join(' ')
+    );
   })();
 </script>
 
@@ -835,6 +875,16 @@
         <text x={lXScale(0.5)} y={lM.top - 4} text-anchor="middle" font-size="8"
           font-family="var(--font-mono)" fill="#ef4444" font-weight="600">s = ½ → ∞!</text>
 
+        <!-- Y-axis grid -->
+        {#each [1, 2, 5, 10, 20, 50, 100, 200, 500] as tick}
+          {#if tick < lbYMax && tick > 0}
+            <line x1={lM.left} y1={lbYScale(tick)} x2={lPlotW - lM.right} y2={lbYScale(tick)}
+              stroke="var(--color-border-light)" stroke-width="0.5" />
+            <text x={lM.left - 4} y={lbYScale(tick)} text-anchor="end" dominant-baseline="central"
+              font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">{tick}</text>
+          {/if}
+        {/each}
+
         <!-- Axes -->
         <line x1={lM.left} y1={lM.top + lPH} x2={lPlotW - lM.right} y2={lM.top + lPH}
           stroke="var(--color-border)" stroke-width="1" />
@@ -844,7 +894,7 @@
 
         <!-- The lower bound curve -->
         <g clip-path="url(#lb-clip)">
-          {#each lowerBoundPaths as path}
+          {#each lbPath as path}
             <path d={path} fill="none" stroke="#ef4444" stroke-width="2.5" />
           {/each}
         </g>
@@ -852,8 +902,8 @@
         <!-- Current s marker + dot -->
         <line x1={lXScale(realS)} y1={lM.top} x2={lXScale(realS)} y2={lM.top + lPH}
           stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
-        {#if currentLB < rYMax}
-          <circle cx={lXScale(realS)} cy={rYScale(currentLB)} r="5" fill="#ef4444" stroke="white" stroke-width="2" />
+        {#if currentLB < lbYMax}
+          <circle cx={lXScale(realS)} cy={lbYScale(currentLB)} r="5" fill="#ef4444" stroke="white" stroke-width="2" />
         {/if}
       </svg>
 
