@@ -200,6 +200,29 @@
 
   $: realCharacters = charClassification.real;
 
+  // Coefficients for the grid
+  const numCoeffs = 36;
+  $: coeffData = (() => {
+    const chi = realCharIdx >= 0 ? characters[realCharIdx] : null;
+    if (!chi) return [];
+    const coeffs = [];
+    let runningSum = 0;
+    for (let n = 1; n <= numCoeffs; n++) {
+      let an = 0;
+      for (let d = 1; d <= n; d++) {
+        if (n % d === 0) {
+          an += chi.values.get(d % q)?.[0] ?? 0;
+        }
+      }
+      an = Math.round(an);
+      runningSum += an;
+      coeffs.push({ n, an, runningSum });
+    }
+    return coeffs;
+  })();
+
+  $: coeffTotal = coeffData.length > 0 ? coeffData[coeffData.length - 1].runningSum : 0;
+
   $: realCharIdx = realCharacters.length > 0 ? realCharacters[0].idx : -1;
   let selectedRealCharIdx = 0;
   $: {
@@ -727,43 +750,47 @@
   <div class="viz-container">
     <h4>The coefficients of ζ(s)·L(s, χ) — all non-negative</h4>
 
-    {#if realCharacters.length > 0}
-      <div class="coeff-controls">
-        <span class="coeff-control-label">Real character:</span>
-        {#each realCharacters as rc, i}
-          <button class="csg-chip real" class:active={selectedRealCharIdx === i}
-            on:click={() => selectedRealCharIdx = i}>
-            {rc.chi.label}
-          </button>
-        {/each}
-        <span class="coeff-control-label" style="margin-left: 0.5em">q = {q}</span>
-      </div>
-
-      {@const chi = characters[realCharIdx]}
-      {#if chi}
-        <div class="coeff-grid">
-          {#each Array(30) as _, i}
-            {@const n = i + 1}
-            {@const an = (() => {
-              let dchi = 0;
-              for (let d = 1; d <= n; d++) {
-                if (n % d === 0) {
-                  const chiD = chi.values.get(d % q)?.[0] ?? 0;
-                  dchi += chiD;
-                }
-              }
-              return dchi;
-            })()}
-            <div class="coeff-cell" class:zero={an === 0}>
-              <span class="coeff-n">a<sub>{n}</sub></span>
-              <span class="coeff-val">{an}</span>
-            </div>
+    <div class="coeff-controls">
+      <Slider label="q" bind:value={q} min={3} max={12} />
+      {#if realCharacters.length > 0}
+        <div class="coeff-char-picker">
+          <span class="coeff-control-label">Character:</span>
+          {#each realCharacters as rc, i}
+            <button class="csg-chip real" class:active={selectedRealCharIdx === i}
+              on:click={() => selectedRealCharIdx = i}>
+              {rc.chi.label}
+            </button>
           {/each}
         </div>
-        <p class="ef-conclusion">Every coefficient is ≥ 0. The partial sums can only grow — they
-        never decrease. Try changing q above to see different real characters.
-        This is the property that Landau's theorem exploits.</p>
       {/if}
+    </div>
+
+    {#if realCharacters.length > 0 && coeffData.length > 0}
+      <div class="coeff-table">
+        <div class="coeff-header-row">
+          <span class="coeff-hdr">n</span>
+          {#each coeffData as c}
+            <span class="coeff-hdr">{c.n}</span>
+          {/each}
+        </div>
+        <div class="coeff-data-row">
+          <span class="coeff-row-label">a<sub>n</sub></span>
+          {#each coeffData as c}
+            <span class="coeff-data" class:zero={c.an === 0}>{c.an}</span>
+          {/each}
+        </div>
+        <div class="coeff-sum-row">
+          <span class="coeff-row-label">Σ</span>
+          {#each coeffData as c}
+            <span class="coeff-sum">{c.runningSum}</span>
+          {/each}
+        </div>
+      </div>
+      <p class="ef-conclusion">
+        Every <strong>a<sub>n</sub> ≥ 0</strong> — the running sum (bottom row) can only grow.
+        Total after {numCoeffs} terms: <strong>{coeffTotal}</strong>.
+        This is the property that Landau's theorem exploits.
+      </p>
     {:else}
       <p class="ef-conclusion">No real non-principal characters for q = {q}. Try q = 4, 5, or 8.</p>
     {/if}
@@ -1147,45 +1174,71 @@
     text-align: center;
   }
 
-  .coeff-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3em;
-    justify-content: center;
+  .coeff-table {
+    overflow-x: auto;
     margin: 0.5em 0;
-  }
-
-  .coeff-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 38px;
-    padding: 0.25em 0;
-    border-radius: 6px;
-    background: var(--color-accent-light);
-    border: 1px solid var(--color-accent);
-  }
-
-  .coeff-cell.zero {
-    background: var(--color-bg-alt);
-    border-color: var(--color-border-light);
-    opacity: 0.5;
-  }
-
-  .coeff-n {
     font-family: var(--font-mono);
+    font-size: 0.68rem;
+  }
+
+  .coeff-header-row, .coeff-data-row, .coeff-sum-row {
+    display: grid;
+    grid-template-columns: 24px repeat(36, 1fr);
+    gap: 0;
+    min-width: max-content;
+  }
+
+  .coeff-header-row {
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .coeff-hdr {
+    text-align: center;
+    padding: 0.15em 0;
+    color: var(--color-text-light);
     font-size: 0.6rem;
-    color: var(--color-text-muted);
   }
 
-  .coeff-val {
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
+  .coeff-row-label {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-align: right;
+    padding-right: 0.3em;
+    font-size: 0.65rem;
+  }
+
+  .coeff-data {
+    text-align: center;
+    padding: 0.2em 0;
     font-weight: 700;
     color: var(--color-accent);
+    background: rgba(37, 99, 235, 0.05);
+    border-right: 1px solid rgba(0,0,0,0.03);
   }
 
-  .coeff-cell.zero .coeff-val { color: var(--color-text-light); }
+  .coeff-data.zero {
+    color: var(--color-text-light);
+    background: none;
+    font-weight: 400;
+  }
+
+  .coeff-sum-row {
+    border-top: 1.5px solid var(--color-border);
+  }
+
+  .coeff-sum {
+    text-align: center;
+    padding: 0.15em 0;
+    color: var(--color-prime);
+    font-size: 0.6rem;
+    font-weight: 500;
+  }
+
+  .coeff-char-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+  }
 
   .coeff-controls {
     display: flex;
