@@ -386,10 +386,11 @@
 
   <p><strong>Step 1: Take the log of the Euler product.</strong>
   Since <Tex tex={String.raw`L(s,\chi) = \prod_p \frac{1}{1-\chi(p)/p^s}`} />, taking logs turns the product into a sum.
-  For each character, <Tex tex={String.raw`\log L(s,\chi)`} /> is approximately the sum of
-  <Tex tex={String.raw`\chi(p)/p^s`} /> over primes:</p>
+  The full expansion is <Tex tex={String.raw`\log L(s,\chi) = \sum_p \sum_{k=1}^{\infty} \frac{\chi(p)^k}{k\,p^{ks}}`} />,
+  but the <Tex tex={String.raw`k \ge 2`} /> terms are tiny (they converge even at <Tex tex="s = 1" />
+  and don't affect the divergence). Only the <Tex tex="k = 1" /> terms matter:</p>
 
-  <Tex display tex={String.raw`\log L(s, \chi) \approx \sum_{p} \frac{\chi(p)}{p^s}`} />
+  <Tex display tex={String.raw`\log L(s, \chi) = \sum_{p} \frac{\chi(p)}{p^s} + \text{(bounded)}`} />
 
   <div class="viz-container">
     <h4>Step 1: log L decomposes over primes</h4>
@@ -457,8 +458,10 @@
   </div>
 
   <p><strong>Step 3: The filter picks out one column.</strong>
-  On the right side of the equation, for each prime, the extraction formula fires:
-  it equals 1 when <Tex tex={String.raw`p \equiv ${derivA} \pmod{${derivQ}}`} /> and 0 otherwise.
+  On the right side, for each prime <Tex tex="p" />, the sum
+  <Tex tex={String.raw`\sum_\chi \overline{\chi(a)} \chi(p) / \varphi(q)`} /> is exactly the
+  extraction formula from the characters section (character orthogonality). It equals 1
+  when <Tex tex={String.raw`p \equiv ${derivA} \pmod{${derivQ}}`} /> and 0 otherwise.
   Only primes in column {derivA} survive:</p>
 
   <div class="viz-container">

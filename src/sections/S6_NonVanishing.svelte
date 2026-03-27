@@ -431,8 +431,11 @@
 
   <p>Now here's the key: we know the product has <strong>exactly 1 pole</strong> (from <Tex tex="\chi_0" />).
   If a complex character <Tex tex="\chi_1" /> had <Tex tex="L(1, \chi_1) = 0" />,
-  its conjugate <Tex tex={String.raw`\overline{\chi_1}`} /> (a <em>different</em> character) would also have
-  <Tex tex={String.raw`L(1, \overline{\chi_1}) = 0`} />. That's <strong>2 zeros vs 1 pole</strong> — try setting that
+  its conjugate <Tex tex={String.raw`\overline{\chi_1}`} /> would also have
+  <Tex tex={String.raw`L(1, \overline{\chi_1}) = 0`} />.
+  For a <em>complex</em> (non-real) character, <Tex tex={String.raw`\chi_1 \neq \overline{\chi_1}`} /> — they
+  assign different arrows to the same residues — so these are two <em>separate</em> characters
+  in the product, giving <strong>2 zeros vs 1 pole</strong> — try setting that
   in the playground above. The product drops below 1. <strong>Contradiction!</strong></p>
 
   <Callout type="insight">
@@ -471,13 +474,17 @@
 
   <p>But <strong>if <Tex tex="L(1, \chi) = 0" /></strong>, the zero would cancel the pole.
   The function would be smooth (no singularity) for all <Tex tex="s > 0" />.
-  <strong>Landau's theorem</strong> says: a Dirichlet series with non-negative coefficients can only
-  stop converging at a singularity. No singularity → the series converges for <em>all</em> <Tex tex="s > 0" />.</p>
+  <strong>Landau's theorem</strong> says: if a Dirichlet series <Tex tex={String.raw`\sum a_n/n^s`} /> has all
+  <Tex tex={String.raw`a_n \ge 0`} />, and the function it defines has no singularities for <Tex tex="s > \sigma" />,
+  then the series converges for all <Tex tex="s > \sigma" />.
+  So with no singularity anywhere for <Tex tex="s > 0" />, the series would converge for <em>all</em> <Tex tex="s > 0" />.</p>
 
   <h4>Step 3: The explosion at s = ½</h4>
 
-  <p>But wait — the non-negative coefficients include <Tex tex={String.raw`1/m^{2s}`} /> for every
-  coprime <Tex tex="m" />. At <Tex tex="s = 1/2" />, this becomes
+  <p>But wait — look at what's hiding in the series. When <Tex tex={String.raw`\chi(p) = 1`} />,
+  the squared factor <Tex tex={String.raw`1/(1-p^{-s})^2`} /> includes the term <Tex tex={String.raw`1/p^{2s}`} />.
+  Multiplying across all such primes, the series contains <Tex tex={String.raw`1/m^{2s}`} /> for
+  every coprime <Tex tex="m" />. At <Tex tex="s = 1/2" />, this becomes
   <Tex tex={String.raw`\sum 1/m`} /> — the harmonic series, which diverges!
   Drag <Tex tex="s" /> toward ½ to see it blow up:</p>
 

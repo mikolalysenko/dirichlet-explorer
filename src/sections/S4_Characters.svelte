@@ -81,10 +81,15 @@
 
   <h3>Characters as rotating phasors</h3>
 
-  <p>Each character is a <strong>complex exponential</strong> — a phasor that rotates around the
-  unit circle as you sweep the input <Tex tex="x" /> from 0 to <Tex tex="q" />:</p>
+  <p>Each character behaves like a <strong>complex exponential</strong> — a phasor that rotates around the
+  unit circle. We can visualize it as a continuous wave by letting <Tex tex="x" /> sweep
+  from 0 to <Tex tex="q" />:</p>
 
   <Tex display tex={String.raw`\chi_k(x) = e^{2\pi i \cdot a_k \cdot x / q}`} />
+
+  <p>(Strictly speaking, characters are only defined at coprime integer residues. This formula
+  is the smooth wave that passes through those values — it's the continuous extension that
+  reveals the underlying frequency structure.)</p>
 
   <p>The <strong>principal character</strong> <Tex tex="\chi_0" /> has frequency 0, so its phasor
   points right (value 1) everywhere. Each successive character has a higher frequency <Tex tex="a_k" />,

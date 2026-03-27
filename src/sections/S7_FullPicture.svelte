@@ -42,7 +42,7 @@
     combination of <Tex tex="\log L(s, \chi)" /> over all characters. The <strong>principal character's</strong>
     L-function has a pole at <Tex tex="s=1" />, making its contribution blow up.
     The <strong>non-principal characters'</strong> L-functions are all finite and nonzero at
-    <Tex tex="s=1" /> (proved by the product-of-L-functions argument), so they stay bounded.
+    <Tex tex="s=1" /> (proved using the product trick and Landau's theorem), so they stay bounded.
     The blowup from the principal character overwhelms everything else, forcing the
     sum over primes to diverge — proving there are <strong>infinitely many primes</strong>
     in every coprime residue class.</p>
