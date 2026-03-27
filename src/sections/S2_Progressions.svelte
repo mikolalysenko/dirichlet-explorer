@@ -79,8 +79,35 @@
     So these columns are essentially prime-free.</p>
   </Callout>
 
-  <p>For <Tex tex="q = {q}" />, the coprime columns are: <strong class="prime-number">{residues.join(', ')}</strong>
-  — that's <Tex tex="\varphi({q}) = {phi}" /> columns (we call this <em>Euler's totient function</em>).</p>
+  <h3>Counting the coprime columns: Euler's totient function</h3>
+
+  <p>How many "prime-friendly" columns are there? We need to count the numbers from 1 to <Tex tex="q" />
+  that share no factor with <Tex tex="q" />. This count is called <strong>Euler's totient function</strong>,
+  written <Tex tex={String.raw`\varphi(q)`} />.</p>
+
+  <div class="totient-viz">
+    <div class="totient-row">
+      {#each Array(q) as _, i}
+        {@const n = i + 1}
+        {@const cop = gcd(n, q) === 1}
+        <div class="totient-cell" class:coprime={cop} class:not-coprime={!cop}>
+          <span class="totient-n">{n}</span>
+          {#if !cop && n < q}
+            <span class="totient-factor">{gcd(n, q)} | {q}</span>
+          {/if}
+        </div>
+      {/each}
+    </div>
+    <p class="totient-summary">
+      <Tex tex={String.raw`\varphi(${q})`} /> = <strong>{phi}</strong>
+      — the numbers <strong class="prime-number">{residues.join(', ')}</strong> share no factor with {q}.
+    </p>
+  </div>
+
+  <p>Try changing <Tex tex="q" /> with the slider above and watch how <Tex tex={String.raw`\varphi(q)`} /> changes.
+  When <Tex tex="q" /> is prime, almost every number is coprime to it
+  (<Tex tex={String.raw`\varphi(q) = q - 1`} />).
+  When <Tex tex="q" /> has many factors, fewer columns survive.</p>
 
   <Callout type="insight">
     <p><strong>Dirichlet's Theorem:</strong> If your starting number <Tex tex="a" /> and step size <Tex tex="q" />
@@ -155,6 +182,70 @@
   }
 
   .column-info p {
+    margin: 0;
+  }
+
+  .totient-viz {
+    margin: 1em 0;
+    padding: 1em;
+    background: white;
+    border: 1px solid var(--color-border-light);
+    border-radius: 10px;
+  }
+
+  .totient-row {
+    display: flex;
+    gap: 0.35em;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 0.6em;
+  }
+
+  .totient-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 42px;
+    height: 48px;
+    border-radius: 8px;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .totient-cell.coprime {
+    background: var(--color-accent-light);
+    border: 2px solid var(--color-accent);
+  }
+
+  .totient-cell.not-coprime {
+    background: var(--color-bg-alt);
+    border: 1.5px solid var(--color-border-light);
+    opacity: 0.5;
+  }
+
+  .totient-n {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .totient-cell.coprime .totient-n {
+    color: var(--color-accent);
+  }
+
+  .totient-cell.not-coprime .totient-n {
+    color: var(--color-text-light);
+  }
+
+  .totient-factor {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    color: var(--color-text-light);
+  }
+
+  .totient-summary {
+    text-align: center;
+    font-size: 0.9rem;
     margin: 0;
   }
 </style>
