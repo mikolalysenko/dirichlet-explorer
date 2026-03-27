@@ -7,6 +7,7 @@
   import EulerProductViz from '../components/viz/EulerProductViz.svelte';
   import EulerSieveViz from '../components/viz/EulerSieveViz.svelte';
   import EulerMultiplyViz from '../components/viz/EulerMultiplyViz.svelte';
+  import GeometricSeriesViz from '../components/viz/GeometricSeriesViz.svelte';
   import { zetaPartial } from '../lib/lfunctions.js';
   import { listPrimes } from '../lib/primes.js';
 
@@ -192,12 +193,25 @@
 
   <h4>Step 1: A geometric series for each prime</h4>
 
-  <p>Remember the geometric series formula: <Tex tex={String.raw`1 + r + r^2 + r^3 + \cdots = \frac{1}{1-r}`} /> when <Tex tex="|r| < 1" />.
-  For a prime <Tex tex="p" />, plugging in <Tex tex={String.raw`r = 1/p^s`} /> gives:</p>
+  <p>The key ingredient is the <strong>geometric series formula</strong>:</p>
+
+  <Tex display tex={String.raw`1 + r + r^2 + r^3 + \cdots = \frac{1}{1-r} \qquad \text{(when } |r| < 1\text{)}`} />
+
+  <p>Why does this work? Here's a slick trick. Call the sum <strong>S</strong>. If you multiply
+  <strong>S</strong> by <strong>r</strong>, you get the same series shifted over by one position.
+  Subtract: every term cancels except the first one, giving <Tex tex="S - rS = 1" />,
+  so <Tex tex={String.raw`S = \frac{1}{1-r}`} />.</p>
+
+  <div class="viz-container">
+    <h4>The geometric series — drag r to see it converge</h4>
+    <GeometricSeriesViz r={0.5} />
+  </div>
+
+  <p>For a prime <Tex tex="p" />, plugging in <Tex tex={String.raw`r = 1/p^s`} /> gives:</p>
 
   <Tex display tex={String.raw`\frac{1}{1 - p^{-s}} = 1 + \frac{1}{p^s} + \frac{1}{p^{2s}} + \frac{1}{p^{3s}} + \cdots`} />
 
-  <p>Each factor on the right side of the Euler product is an infinite sum over powers of one prime.</p>
+  <p>Each factor in the Euler product is just a geometric series for one prime!</p>
 
   <h4>Step 2: Multiply two geometric series</h4>
 
