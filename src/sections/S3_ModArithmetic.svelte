@@ -32,11 +32,10 @@
     <h4>The mod-{q} clock</h4>
     <Slider label="Clock size (q)" bind:value={q} min={3} max={16} />
 
-    <div class="slider-row">
-      <label>Number:</label>
-      <input type="number" bind:value={inputN} min={0} max={200} class="number-input" />
-      <span class="value">≡ {((inputN % q) + q) % q} (mod {q})</span>
-    </div>
+    <Slider label="Number" bind:value={inputN} min={-50} max={200} step={1} format={v => v} />
+    <p class="mod-result">
+      <span class="number">{inputN}</span> ≡ <strong class="number">{((inputN % q) + q) % q}</strong> (mod {q})
+    </p>
 
     <ModClock {q} highlightN={inputN} showCoprime={true} />
 
@@ -104,6 +103,19 @@
 </Section>
 
 <style>
+  .mod-result {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    text-align: center;
+    margin: 0.3em 0 0.8em;
+    color: var(--color-text-muted);
+  }
+
+  .mod-result strong {
+    color: var(--color-accent);
+    font-size: 1.1rem;
+  }
+
   .number-input {
     font-family: var(--font-mono);
     font-size: 0.9rem;

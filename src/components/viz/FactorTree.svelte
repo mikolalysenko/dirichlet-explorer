@@ -17,12 +17,18 @@
     nodes = [{ id: nextId++, value: startNumber, parentId: -1, side: null }];
   }
 
-  function smallestFactor(n) {
+  // Find all divisors of n (excluding 1 and n), pick one at random
+  function randomDivisor(n) {
     if (n <= 1) return n;
+    const divisors = [];
     for (let d = 2; d * d <= n; d++) {
-      if (n % d === 0) return d;
+      if (n % d === 0) {
+        divisors.push(d);
+        if (d !== n / d) divisors.push(n / d);
+      }
     }
-    return n;
+    if (divisors.length === 0) return n; // n is prime
+    return divisors[Math.floor(Math.random() * divisors.length)];
   }
 
   function split(nodeId) {
@@ -30,7 +36,7 @@
     if (!node) return;
     if (isPrime(node.value) || node.value <= 1) return;
     if (nodes.some(n => n.parentId === nodeId)) return; // already split
-    const f = smallestFactor(node.value);
+    const f = randomDivisor(node.value);
     nodes = [
       ...nodes,
       { id: nextId++, value: f, parentId: nodeId, side: 'left' },
@@ -46,7 +52,7 @@
       changed = false;
       for (const node of current) {
         if (!isPrime(node.value) && node.value > 1 && !current.some(n => n.parentId === node.id)) {
-          const f = smallestFactor(node.value);
+          const f = randomDivisor(node.value);
           current = [
             ...current,
             { id: id++, value: f, parentId: node.id, side: 'left' },
