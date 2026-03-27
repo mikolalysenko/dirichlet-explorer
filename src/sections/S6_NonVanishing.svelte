@@ -330,29 +330,27 @@
 <Section id="nonvanishing" title="The Heart of the Proof" subtitle="Why L(1, χ) can never be zero — the final piece of the puzzle.">
 
   <p>We've established that Dirichlet's theorem is true <em>if</em> no L-function vanishes at
-  <Tex tex="s = 1" /> (for non-principal characters). Now we need to prove this can't happen.</p>
+  <Tex tex="s = 1" /> (for non-principal characters). Now we need to prove this can't happen.
+  The argument is a proof by contradiction: <strong>assume</strong> some <Tex tex="L(1, \chi) = 0" />,
+  then show this leads to an impossibility.</p>
 
-  <p>This is the deepest part of the proof. The argument is a beautiful proof by contradiction.</p>
+  <h3>A product that can never be small</h3>
 
-  <h3>The product trick</h3>
+  <p>The key tool: take all the L-functions and multiply them together into one big product
+  <Tex tex={String.raw`\prod_\chi L(s, \chi)`} />. This product has a crucial property:
+  for real <Tex tex="s > 1" />, it is <strong>always at least 1</strong>.</p>
 
-  <p>Take all the L-functions and multiply them together:</p>
+  <Callout>
+    <p><strong>Why ≥ 1?</strong> Using the Euler product and character orthogonality, the log of this
+    product simplifies to a sum that only counts prime powers <Tex tex={String.raw`p^k \equiv 1 \pmod{q}`} />,
+    each with a positive weight. A sum of non-negative terms is non-negative,
+    so <Tex tex={String.raw`\log \prod \ge 0`} />, which means <Tex tex={String.raw`\prod \ge e^0 = 1`} />.</p>
+  </Callout>
 
-  <Tex display tex="\prod_\chi L(s, \chi)" />
-
-  <p>This product has a remarkable property: when you take its logarithm using the Euler product, you get:</p>
-
-  <Tex display tex={String.raw`\log \prod_\chi L(s,\chi) = \sum_p \sum_{k \ge 1} \frac{1}{k \, p^{ks}} \sum_\chi \chi(p^k)`} />
-
-  <p>By the orthogonality of characters, the inner sum <Tex tex={String.raw`\sum_\chi \chi(p^k)`} /> equals
-  <Tex tex={String.raw`\varphi(q)`} /> when <Tex tex={String.raw`p^k \equiv 1 \pmod{q}`} />, and 0 otherwise.
-  So the log is a sum of <strong>non-negative</strong> terms — it's counting (with weights) prime
-  powers that are congruent to 1 mod <Tex tex="q" />. Since the log is non-negative,
-  the product itself is <Tex tex={String.raw`\ge e^0 = 1`} />.</p>
-
-  <p>In other words: all the "coefficients" in the Dirichlet series expansion of this product
-  are non-negative, the first coefficient is 1, so the product is
-  <strong>always at least 1</strong> for real <Tex tex="s > 1" />.</p>
+  <p>The product also has exactly <strong>one pole</strong> at <Tex tex="s = 1" /> (from the principal
+  character <Tex tex="\chi_0" />, whose L-function is essentially <Tex tex={String.raw`\zeta(s)`} />).
+  Every other character's L-function is finite at <Tex tex="s = 1" />.
+  The question is: can any of them be <em>zero</em>?</p>
 
   <div class="viz-container">
     <h4>Product of all L-functions mod {q}</h4>
@@ -438,12 +436,14 @@
     </div>
   </div>
 
-  <h3>The contradiction for complex characters</h3>
+  <h3>Case 1: Complex characters — two zeros beat one pole</h3>
 
-  <p>A <strong>pole</strong> at <Tex tex="s = 1" /> means the function blows up like <Tex tex={String.raw`\frac{1}{s-1}`} />.
-  A <strong>zero</strong> means it vanishes like <Tex tex="(s-1)" />. When you multiply functions,
-  their poles and zeros combine. Try adding poles and zeros below to see what happens
-  to the product near <Tex tex="s = 1" />:</p>
+  <Callout>
+    <p><strong>Poles and zeros:</strong> A <strong>pole</strong> at <Tex tex="s = 1" /> means the function
+    blows up like <Tex tex={String.raw`\frac{1}{s-1}`} />. A <strong>zero</strong> means it vanishes
+    like <Tex tex="(s-1)" />. When you multiply functions, poles and zeros combine — they can
+    cancel each other. Play with the widget below to build intuition:</p>
+  </Callout>
 
   <div class="viz-container">
     <h4>Pole/zero playground — what happens near s = 1?</h4>
@@ -542,19 +542,18 @@
     would be forced below 1, contradicting the non-negative coefficient lower bound.</p>
   </Callout>
 
-  <h3>The subtle case: real characters</h3>
+  <h3>Case 2: Real characters — a subtler trap</h3>
 
-  <p>Try setting 1 pole and 1 zero in the playground above. They cancel — the product
-  stays finite. No contradiction! A <strong>real character</strong> equals its own conjugate
-  (<Tex tex={String.raw`\chi = \overline{\chi}`} />), so a zero gives only <em>one</em> zero, not two.
-  We need a different argument.</p>
+  <p>Set 1 pole and 1 zero in the playground above — they cancel, the product stays finite.
+  No contradiction! A <strong>real character</strong> satisfies
+  <Tex tex={String.raw`\chi = \overline{\chi}`} />, so a zero gives only <em>one</em> zero against
+  the one pole. The counting argument doesn't work. We need a completely different idea.</p>
 
-  <h4>Step 1: A new product with non-negative coefficients</h4>
+  <h4>A new product with a hidden time bomb</h4>
 
-  <p>Instead of multiplying <em>all</em> L-functions, consider just two:
-  <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> for a real character <Tex tex="\chi" />.
-  Why this particular product? Because it has a magical property: <strong>every coefficient
-  in its series expansion is non-negative</strong>.</p>
+  <p>Consider just <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> for a real character.
+  This product has a special property: <strong>every coefficient in its series expansion
+  is non-negative</strong>. Why? Look at the Euler product factors:</p>
 
   <p>To see why, look at what happens at each prime in the Euler product.
   A real character assigns <Tex tex={String.raw`\chi(p) = +1`} /> or <Tex tex={String.raw`\chi(p) = -1`} />
@@ -595,16 +594,15 @@
     </div>
   {/if}
 
-  <h4>Step 2: The trap — Landau's theorem</h4>
+  <h4>The trap snaps shut — Landau's theorem</h4>
 
-  <p>Normally, <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> has a pole at <Tex tex="s = 1" />
-  (from <Tex tex={String.raw`\zeta`} />). The series <Tex tex={String.raw`\sum a_n/n^s`} /> converges for
-  <Tex tex="s > 1" /> and blows up at <Tex tex="s = 1" />. The pole marks the boundary where
-  the series stops converging.</p>
+  <p>Normally, <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> has a pole at <Tex tex="s = 1" />.
+  The series converges for <Tex tex="s > 1" /> and the pole is the boundary — the wall where
+  it stops converging. That's fine.</p>
 
-  <p>But <strong>if <Tex tex="L(1, \chi) = 0" /></strong>, the zero would cancel the pole.
-  The function would be smooth — no singularity anywhere for <Tex tex="s > 0" />.
-  And here's where the trap snaps shut.</p>
+  <p>But <strong>if <Tex tex="L(1, \chi) = 0" /></strong>, the zero cancels the pole. No wall.
+  The function is smooth for all <Tex tex="s > 0" />.
+  For a non-negative series, that's a disaster:</p>
 
   <Callout>
     <p><strong>Landau's theorem:</strong> If a series <Tex tex={String.raw`\sum a_n / n^s`} /> has all
@@ -698,19 +696,15 @@
     </div>
   </div>
 
-  <p>If the pole at <Tex tex="s = 1" /> is cancelled (because <Tex tex="L(1,\chi) = 0" />),
-  there are no singularities for <Tex tex="s > 0" />. By Landau's theorem, our non-negative series
-  <Tex tex={String.raw`\sum a_n/n^s`} /> would have to converge for <em>all</em> <Tex tex="s > 0" />.
-  That sounds fine — until you look at what the series actually contains...</p>
+  <p>By Landau's theorem, our non-negative series would be forced to converge for
+  <em>all</em> <Tex tex="s > 0" />. But look at what's hiding inside it:</p>
 
-  <h4>Step 3: The explosion at s = ½</h4>
+  <h4>The explosion at s = ½</h4>
 
-  <p>But wait — look at what's hiding in the series. When <Tex tex={String.raw`\chi(p) = 1`} />,
-  the squared factor <Tex tex={String.raw`1/(1-p^{-s})^2`} /> includes the term <Tex tex={String.raw`1/p^{2s}`} />.
-  Multiplying across all such primes, the series contains <Tex tex={String.raw`1/m^{2s}`} /> for
-  every coprime <Tex tex="m" />. At <Tex tex="s = 1/2" />, this becomes
-  <Tex tex={String.raw`\sum 1/m`} /> — the harmonic series, which diverges!
-  Drag <Tex tex="s" /> toward ½ to see it blow up:</p>
+  <p>The series contains terms <Tex tex={String.raw`1/m^{2s}`} /> for every coprime <Tex tex="m" />
+  (from the squared Euler factors where <Tex tex={String.raw`\chi(p) = 1`} />).
+  At <Tex tex="s = 1/2" />, this becomes <Tex tex={String.raw`\sum 1/m`} /> — the harmonic series,
+  which we already know diverges! Drag <Tex tex="s" /> toward ½ to see it blow up:</p>
 
   {#if realCharIdx >= 0}
     <div class="viz-container">
