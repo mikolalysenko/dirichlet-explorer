@@ -269,7 +269,7 @@
     return String(n).split('').map(d => supD[parseInt(d)]).join('');
   }
 
-  // ── Landau's theorem visualization ─────────────────────────────
+  // ── Non-negative series visualization ───────────────────────────
   let landauMode = 'nonneg'; // 'nonneg' or 'alternating'
   let landauN = 200;
 
@@ -610,7 +610,7 @@
     <div class="char-sort-section">
       <div class="css-header real-header">
         <span class="css-title">Real characters</span>
-        <span class="css-tag">→ Case 2: needs Landau's theorem</span>
+        <span class="css-tag">→ Case 2: the non-negative series trap</span>
       </div>
       {#if charClassification.real.length > 0}
         {#each charClassification.real as rc}
@@ -789,41 +789,33 @@
       <p class="ef-conclusion">
         Every <strong>a<sub>n</sub> ≥ 0</strong> — the running sum (bottom row) can only grow.
         Total after {numCoeffs} terms: <strong>{coeffTotal}</strong>.
-        This is the property that Landau's theorem exploits.
+        This is the key property that springs the trap.
       </p>
     {:else}
       <p class="ef-conclusion">No real non-principal characters for q = {q}. Try q = 4, 5, or 8.</p>
     {/if}
   </div>
 
-  <h4>The trap snaps shut — Landau's theorem</h4>
+  <h4>The trap snaps shut</h4>
 
   <p>Normally, <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> has a pole at <Tex tex="s = 1" />.
-  The series converges for <Tex tex="s > 1" /> and the pole is the boundary — the wall where
+  The series converges for <Tex tex="s > 1" /> and the pole is the wall — the boundary where
   it stops converging. That's fine.</p>
 
   <p>But <strong>if <Tex tex="L(1, \chi) = 0" /></strong>, the zero cancels the pole. No wall.
-  The function is smooth for all <Tex tex="s > 0" />.
-  For a non-negative series, that's a disaster:</p>
+  The function is smooth for all <Tex tex="s > 0" />.</p>
 
-  <Callout>
-    <p><strong>Landau's theorem:</strong> If a series <Tex tex={String.raw`\sum a_n / n^s`} /> has all
-    non-negative coefficients (<Tex tex={String.raw`a_n \ge 0`} />), then the boundary where
-    it stops converging <em>must</em> be a singularity of the function.</p>
-    <p><strong>Why?</strong> Think about it intuitively: with non-negative terms, the partial sums
-    can only grow. The series can't "accidentally" diverge at some point where the function
-    is perfectly smooth — there's no cancellation between terms that could cause a hidden blowup.
-    If the function is well-behaved at some point, the series must converge there too.
-    The <em>only</em> thing that can stop a non-negative series from converging is an actual
-    singularity (pole or branch point) in the function.</p>
-    <p>So: <strong>no singularity → the series converges everywhere to the right.</strong></p>
-  </Callout>
+  <p>Here's why that's a disaster for a non-negative series: when all the terms are ≥ 0,
+  the partial sums can only grow — they march upward monotonically. There's no cancellation
+  between positive and negative terms that could let the series "sneak past" a problem point.
+  So if the function is smooth at some value of <Tex tex="s" />, the series <em>must</em>
+  converge there. <strong>No singularity means the series converges everywhere.</strong></p>
 
   <p>Try it below. Toggle between non-negative coefficients (which hit a wall at the singularity)
   and alternating signs (which sneak past it):</p>
 
   <div class="viz-container">
-    <h4>Landau's theorem — why non-negative series can't sneak past a singularity</h4>
+    <h4>Why non-negative series can't sneak past a singularity</h4>
 
     <div class="landau-controls">
       <div class="chart-toggle">
@@ -898,7 +890,7 @@
     </div>
   </div>
 
-  <p>By Landau's theorem, our non-negative series would be forced to converge for
+  <p>With no singularity anywhere, our non-negative series would be forced to converge for
   <em>all</em> <Tex tex="s > 0" />. But look at what's hiding inside it:</p>
 
   <h4>The explosion at s = ½</h4>
@@ -975,11 +967,18 @@
   {/if}
 
   <Callout>
-    <p><strong>The contradiction:</strong> If <Tex tex="L(1, \chi) = 0" />, Landau's theorem forces
-    <Tex tex={String.raw`\sum a_n/n^s`} /> to converge for all <Tex tex="s > 0" />. But the lower bound
-    <Tex tex={String.raw`\sum 1/m^{2s}`} /> diverges at <Tex tex="s = 1/2" />. A convergent series can't
-    have a divergent subseries. <strong>Contradiction!</strong>
+    <p><strong>The contradiction:</strong> If <Tex tex="L(1, \chi) = 0" />, the pole vanishes and the
+    non-negative series <Tex tex={String.raw`\sum a_n/n^s`} /> would have to converge for all <Tex tex="s > 0" />.
+    But the lower bound <Tex tex={String.raw`\sum 1/m^{2s}`} /> diverges at <Tex tex="s = 1/2" />.
+    A convergent series can't have a divergent subseries. <strong>Contradiction!</strong>
     So <Tex tex="L(1, \chi) \neq 0" /> for real characters too.</p>
+  </Callout>
+
+  <Callout>
+    <p><strong>Historical note:</strong> Dirichlet himself used a different method for real characters —
+    he computed <Tex tex="L(1, \chi)" /> explicitly using the <em>class number formula</em>, showing it
+    equals a positive number involving the structure of quadratic number fields. The non-negative
+    series argument we presented here is a more modern approach that avoids that heavy machinery.</p>
   </Callout>
 
   <p>And with that, every piece is in place. Let's see the full picture.</p>

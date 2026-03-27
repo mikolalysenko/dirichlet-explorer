@@ -127,7 +127,7 @@ Three-step derivation:
 |---------|--------------|
 | Product of all L-functions ≥ 1 | **Product curve** — plot stays above 1. Derived from orthogonality: log is a sum of non-negative terms. |
 | Complex characters: 2 zeros vs 1 pole | **Tug-of-war diagram**. (s−1)²/(s−1) → 0, contradicts ≥ 1. |
-| Real characters: Landau's theorem | Prose: analytic + non-negative coefficients ⟹ convergence boundary is a singularity. But Σ1/m diverges at s=1/2. Contradiction. |
+| Real characters: non-negative series trap | Non-negative coefficients ⟹ partial sums only grow ⟹ no singularity means convergence everywhere. But Σ1/m diverges at s=1/2. Contradiction. |
 
 ### 7. The full picture
 **Takeaway:** "Every coprime residue class has infinitely many primes, equally distributed."
