@@ -1301,12 +1301,12 @@
   .real-header .css-tag { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
 
   .css-pair-block {
-    margin: 0.3em 0;
-    padding: 0.3em 0;
-    border-bottom: 1px solid var(--color-border-light);
+    margin: 0.4em 0;
+    padding: 0.4em 0.5em;
+    border: 1.5px solid rgba(99, 102, 241, 0.25);
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.03);
   }
-
-  .css-pair-block:last-child { border-bottom: none; }
 
   .css-pair-row {
     display: flex;
