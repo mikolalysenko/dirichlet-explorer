@@ -3,17 +3,37 @@
   import Tex from '../components/Tex.svelte';
   import Callout from '../components/ui/Callout.svelte';
   import FactorTree from '../components/viz/FactorTree.svelte';
+  import PrimeDensityPlot from '../components/viz/PrimeDensityPlot.svelte';
   import Slider from '../components/ui/Slider.svelte';
   import { isPrime, listPrimes } from '../lib/primes.js';
   import { factorize } from '../lib/math-utils.js';
 
   let treeNumber = 60;
   let euclidPrimes = [2, 3, 5];
-  let densityMax = 100;
+  let densityMax = 10000;
 
-  $: product = euclidPrimes.reduce((a, b) => a * b, 1);
-  $: plusOne = product + 1;
-  $: plusOneFactors = factorize(plusOne);
+  // Use BigInt to avoid overflow for large products
+  $: productBig = euclidPrimes.reduce((a, b) => a * BigInt(b), 1n);
+  $: plusOneBig = productBig + 1n;
+  $: productStr = productBig.toLocaleString();
+  $: plusOneStr = plusOneBig.toLocaleString();
+
+  // Factorize using BigInt-safe trial division
+  function factorizeBig(n) {
+    const factors = [];
+    let d = 2n;
+    while (d * d <= n) {
+      while (n % d === 0n) {
+        factors.push(Number(d));
+        n = n / d;
+      }
+      d++;
+    }
+    if (n > 1n) factors.push(Number(n));
+    return factors;
+  }
+
+  $: plusOneFactors = factorizeBig(plusOneBig);
   $: newPrime = plusOneFactors.find(f => !euclidPrimes.includes(f));
 
   function addPrime() {
@@ -21,20 +41,6 @@
       euclidPrimes = [...euclidPrimes, newPrime].sort((a, b) => a - b);
     }
   }
-
-  // Prime density data
-  $: densityBins = (() => {
-    const binSize = 10;
-    const bins = [];
-    for (let start = 1; start <= densityMax; start += binSize) {
-      let count = 0;
-      for (let n = start; n < start + binSize && n <= densityMax; n++) {
-        if (isPrime(n)) count++;
-      }
-      bins.push({ start, count, total: binSize });
-    }
-    return bins;
-  })();
 </script>
 
 <Section id="primes" title="Primes — The Atoms of Numbers" subtitle="Every whole number is built from primes, and there are infinitely many of them.">
@@ -78,10 +84,10 @@
   <div class="viz-container">
     <h4>Euclid's argument in action</h4>
     <p>Your "complete" list of primes: <strong class="prime-number">{euclidPrimes.join(' × ')}</strong></p>
-    <p>Product: <span class="number">{euclidPrimes.join(' × ')} = {product}</span></p>
-    <p>Product + 1 = <span class="number">{plusOne}</span></p>
+    <p>Product: <span class="number">{euclidPrimes.join(' × ')} = {productStr}</span></p>
+    <p>Product + 1 = <span class="number">{plusOneStr}</span></p>
     <p>
-      None of your listed primes divide {plusOne} evenly!
+      None of your listed primes divide {plusOneStr} evenly!
       {#if plusOneFactors.length > 0}
         Its prime factors are: <strong class="prime-number">{plusOneFactors.join(', ')}</strong>
       {/if}
@@ -96,28 +102,19 @@
   <h3>Primes thin out, but never stop</h3>
 
   <p>As numbers get bigger, primes become rarer. But they never disappear entirely.
-  Here's a look at how the density of primes changes:</p>
+  The gold curve below shows the <em>fraction</em> of numbers up to <em>n</em> that are prime.
+  It keeps dropping — but never reaches zero. Hover to see exact counts.</p>
+
+  <p>Remarkably, there's a simple prediction for how fast primes thin out: near <em>n</em>,
+  about <strong>1 out of every ln(<em>n</em>)</strong> numbers is prime (where ln is the natural logarithm).
+  This is the <strong>Prime Number Theorem</strong>, and you can see the predicted curve
+  (dashed blue) closely tracking the real data.</p>
 
   <div class="viz-container">
-    <h4>Prime density — how many primes per group of 10</h4>
-    <Slider label="Show up to" bind:value={densityMax} min={50} max={500} step={50} format={v => v} />
-    <div class="density-chart">
-      {#each densityBins as bin}
-        <div class="density-bar-col">
-          <div
-            class="density-bar"
-            style="height: {bin.count * 18}px"
-          >
-            {#if bin.count > 0}
-              <span class="bar-label">{bin.count}</span>
-            {/if}
-          </div>
-          <span class="bin-label">{bin.start}</span>
-        </div>
-      {/each}
-    </div>
-    <p class="density-note">Each bar shows how many primes are in that group of 10 numbers.
-    Notice: the bars get shorter on average, but never reach zero!</p>
+    <h4>Prime density — what fraction of numbers up to n are prime?</h4>
+    <Slider label="Range" bind:value={densityMax} min={100} max={100000} step={100}
+      format={v => v >= 1000 ? (v/1000) + 'k' : v} />
+    <PrimeDensityPlot maxN={densityMax} />
   </div>
 
   <Callout>
@@ -155,54 +152,5 @@
     background: #1d4ed8;
   }
 
-  .density-chart {
-    display: flex;
-    align-items: flex-end;
-    gap: 3px;
-    height: 120px;
-    margin: 1em 0;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--color-border-light);
-    overflow-x: auto;
-  }
-
-  .density-bar-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 22px;
-    flex: 1;
-  }
-
-  .density-bar {
-    background: var(--color-prime-bg);
-    border: 1px solid var(--color-prime);
-    border-radius: 3px 3px 0 0;
-    width: 100%;
-    min-height: 0;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    transition: height 0.3s ease;
-  }
-
-  .bar-label {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    color: var(--color-prime);
-    font-weight: 600;
-    padding: 1px;
-  }
-
-  .bin-label {
-    font-family: var(--font-mono);
-    font-size: 0.55rem;
-    color: var(--color-text-light);
-    margin-top: 3px;
-  }
-
-  .density-note {
-    font-size: 0.85rem;
-    color: var(--color-text-muted);
-  }
+  /* density plot styles are in the PrimeDensityPlot component */
 </style>
