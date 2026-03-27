@@ -4,6 +4,7 @@
   import Callout from '../components/ui/Callout.svelte';
   import CharacterTable from '../components/viz/CharacterTable.svelte';
   import CharacterPhasors from '../components/viz/CharacterPhasors.svelte';
+  import ComplexMultiply from '../components/viz/ComplexMultiply.svelte';
   import OrthogonalityViz from '../components/viz/OrthogonalityViz.svelte';
   import OrthogonalityAnimated from '../components/viz/OrthogonalityAnimated.svelte';
   import Slider from '../components/ui/Slider.svelte';
@@ -40,8 +41,17 @@
 
   <p>Mathematicians call these arrows <strong>complex numbers on the unit circle</strong>, and write
   them as <Tex tex={String.raw`e^{i\theta}`} /> where <Tex tex={String.raw`\theta`} /> is the angle.
-  But you can just think of them as <em>arrows that you multiply by adding angles</em>.
-  This simple idea is the foundation of Fourier analysis, signal processing, and — as we'll see — Dirichlet's proof.</p>
+  But you can just think of them as <em>arrows that you multiply by adding angles</em>.</p>
+
+  <p>Try it — drag the arrow tips on the two input circles below. The product on the right
+  updates instantly. Notice how the product's angle is always the sum of the two input angles.
+  The <em>conjugate</em> checkbox flips an arrow across the horizontal axis (negates the imaginary part)
+  — this is important later for the character "filter."</p>
+
+  <div class="viz-container">
+    <h4>Complex multiplication — drag the arrows</h4>
+    <ComplexMultiply />
+  </div>
 
   <h3>Characters: labeling residues with arrows</h3>
 
