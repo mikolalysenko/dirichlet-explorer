@@ -145,15 +145,45 @@
     return `f(s) ~ 1/(s−1)${supDigitsLocal[-exp]}`;
   }
 
-  // ── Visualization 2: Real character — two scenarios ─────────
+  // ── Real character: Euler factor visualization ──────────────
   import { zetaPartial } from '../lib/lfunctions.js';
   import { gcd } from '../lib/math-utils.js';
+  import { listPrimes } from '../lib/primes.js';
 
   $: realCharIdx = characters.findIndex(c => {
     if (c.isPrincipal) return false;
     const vals = [...c.values.values()];
     return vals.every(v => Math.abs(v[1]) < 0.01);
   });
+
+  // For each small prime, show the Euler factor and its series expansion
+  $: realChar = realCharIdx >= 0 ? characters[realCharIdx] : null;
+  $: eulerFactors = (() => {
+    if (!realChar) return [];
+    const primes = listPrimes(20);
+    return primes.map(p => {
+      const chiP = realChar.values.get(p % q)?.[0] ?? 0;
+      // chiP is +1, -1, or 0
+      const terms = [];
+      if (chiP === 1) {
+        // 1/(1-x)^2 where x = 1/p^s → coefficients are (k+1) * x^k
+        for (let k = 0; k < 5; k++) {
+          terms.push({ power: k, coeff: k + 1, label: k === 0 ? `1` : `${k + 1}/${p}${k > 1 ? superscriptDigits(k) + 'ˢ' : 'ˢ'}` });
+        }
+      } else if (chiP === -1) {
+        // 1/(1-x^2) where x = 1/p^s → coefficients are 1 at even powers
+        for (let k = 0; k < 5; k++) {
+          terms.push({ power: k * 2, coeff: 1, label: k === 0 ? `1` : `1/${p}${superscriptDigits(k * 2) + 'ˢ'}` });
+        }
+      }
+      return { p, chiP, terms, type: chiP === 1 ? '1/(1−x)²' : chiP === -1 ? '1/(1−x²)' : 'skip' };
+    }).filter(f => f.chiP !== 0);
+  })();
+
+  const supD = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+  function superscriptDigits(n) {
+    return String(n).split('').map(d => supD[parseInt(d)]).join('');
+  }
 
   let realS = 1.5;
 
@@ -453,18 +483,49 @@
 
   <h4>Step 1: A new product with non-negative coefficients</h4>
 
-  <p>Consider just <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> for a real character.
-  At each prime in the Euler product, this gives either:</p>
+  <p>Instead of multiplying <em>all</em> L-functions, consider just two:
+  <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> for a real character <Tex tex="\chi" />.
+  Why this particular product? Because it has a magical property: <strong>every coefficient
+  in its series expansion is non-negative</strong>.</p>
 
-  <ul class="real-cases">
-    <li>If <Tex tex={String.raw`\chi(p) = +1`} />: the factor is
-    <Tex tex={String.raw`\frac{1}{(1-p^{-s})^2}`} /> — a <em>squared</em> geometric series (all terms positive)</li>
-    <li>If <Tex tex={String.raw`\chi(p) = -1`} />: the factor is
-    <Tex tex={String.raw`\frac{1}{1-p^{-2s}}`} /> — a geometric series in <Tex tex={String.raw`p^{-2s}`} /> (also all positive)</li>
-  </ul>
+  <p>To see why, look at what happens at each prime in the Euler product.
+  A real character assigns <Tex tex={String.raw`\chi(p) = +1`} /> or <Tex tex={String.raw`\chi(p) = -1`} />
+  to each prime. The factor from <Tex tex={String.raw`\zeta(s)`} /> is <Tex tex={String.raw`\frac{1}{1 - p^{-s}}`} />
+  and from <Tex tex={String.raw`L(s,\chi)`} /> is <Tex tex={String.raw`\frac{1}{1 - \chi(p) p^{-s}}`} />.
+  Multiply them:</p>
 
-  <p>So this product, written as <Tex tex={String.raw`\sum a_n / n^s`} />, has all
-  <Tex tex={String.raw`a_n \ge 0`} />. This is the key property.</p>
+  {#if realChar && eulerFactors.length > 0}
+    <div class="viz-container">
+      <h4>Euler factors of ζ(s)·L(s, {realChar.label}) at each prime</h4>
+      <div class="euler-factor-list">
+        {#each eulerFactors.slice(0, 6) as f}
+          <div class="euler-factor-card" class:plus={f.chiP === 1} class:minus={f.chiP === -1}>
+            <div class="ef-header">
+              <span class="ef-prime">p = {f.p}</span>
+              <span class="ef-chi">{realChar.label}({f.p}) = {f.chiP > 0 ? '+1' : '−1'}</span>
+            </div>
+            <div class="ef-formula">
+              {#if f.chiP === 1}
+                <Tex tex={String.raw`\frac{1}{(1-p^{-s})^2}`} /> = (1 + x + x² + ...)²
+              {:else}
+                <Tex tex={String.raw`\frac{1}{1-p^{-2s}}`} /> = 1 + x² + x⁴ + ...
+              {/if}
+            </div>
+            <div class="ef-terms">
+              {#each f.terms as t}
+                <span class="ef-term">+{t.label}</span>
+              {/each}
+              <span class="ef-term muted">+ ···</span>
+            </div>
+            <div class="ef-verdict">All terms <strong>≥ 0</strong> ✓</div>
+          </div>
+        {/each}
+      </div>
+      <p class="ef-conclusion">Every prime's factor has only non-negative terms. When you multiply
+      them all together, the result <Tex tex={String.raw`\sum a_n / n^s`} /> also has all
+      <Tex tex={String.raw`a_n \ge 0`} />. This is the key property that sets the trap.</p>
+    </div>
+  {/if}
 
   <h4>Step 2: The trap</h4>
 
@@ -686,8 +747,73 @@
   .c-tag.pole { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
   .c-tag.violation { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
 
-  .real-cases { margin: 0.5em 0 0.5em 1.5em; font-size: 0.95rem; }
-  .real-cases li { margin-bottom: 0.3em; }
+  .euler-factor-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+    justify-content: center;
+    margin-bottom: 0.8em;
+  }
+
+  .euler-factor-card {
+    border-radius: 8px;
+    padding: 0.5em 0.7em;
+    min-width: 140px;
+    max-width: 180px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-align: center;
+  }
+
+  .euler-factor-card.plus {
+    background: rgba(34, 197, 94, 0.06);
+    border: 1.5px solid #22c55e;
+  }
+
+  .euler-factor-card.minus {
+    background: rgba(59, 130, 246, 0.06);
+    border: 1.5px solid #3b82f6;
+  }
+
+  .ef-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.3em;
+    font-size: 0.75rem;
+  }
+
+  .ef-prime { font-weight: 700; }
+  .euler-factor-card.plus .ef-chi { color: #22c55e; font-weight: 600; }
+  .euler-factor-card.minus .ef-chi { color: #3b82f6; font-weight: 600; }
+
+  .ef-formula {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    margin-bottom: 0.3em;
+  }
+
+  .ef-terms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15em;
+    justify-content: center;
+    font-size: 0.65rem;
+    color: var(--color-text);
+    margin-bottom: 0.2em;
+  }
+
+  .ef-term.muted { color: var(--color-text-light); }
+
+  .ef-verdict {
+    font-size: 0.7rem;
+    color: #22c55e;
+  }
+
+  .ef-conclusion {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    text-align: center;
+  }
 
   .real-plots {
     display: flex;
