@@ -150,11 +150,60 @@
   import { gcd } from '../lib/math-utils.js';
   import { listPrimes } from '../lib/primes.js';
 
-  $: realCharIdx = characters.findIndex(c => {
-    if (c.isPrincipal) return false;
-    const vals = [...c.values.values()];
-    return vals.every(v => Math.abs(v[1]) < 0.01);
-  });
+  // Classify all characters: principal, complex pairs, real
+  $: charClassification = (() => {
+    const principal = [];
+    const complexPairs = [];
+    const real = [];
+    const used = new Set();
+
+    for (let i = 0; i < characters.length; i++) {
+      const chi = characters[i];
+      if (chi.isPrincipal) { principal.push({ chi, idx: i }); used.add(i); continue; }
+      if (used.has(i)) continue;
+
+      const vals = [...chi.values.values()];
+      const isReal = vals.every(v => Math.abs(v[1]) < 0.01);
+
+      if (isReal) {
+        real.push({ chi, idx: i });
+        used.add(i);
+      } else {
+        // Find conjugate
+        let conjIdx = -1;
+        for (let j = i + 1; j < characters.length; j++) {
+          if (used.has(j)) continue;
+          const chiJ = characters[j];
+          // Check if chiJ is the conjugate of chi
+          let isConj = true;
+          for (const [k, v] of chi.values) {
+            const vj = chiJ.values.get(k) || [0, 0];
+            if (Math.abs(v[0] - vj[0]) > 0.01 || Math.abs(v[1] + vj[1]) > 0.01) { isConj = false; break; }
+          }
+          if (isConj) { conjIdx = j; break; }
+        }
+        if (conjIdx >= 0) {
+          complexPairs.push({ chi1: chi, chi2: characters[conjIdx], idx1: i, idx2: conjIdx });
+          used.add(i);
+          used.add(conjIdx);
+        } else {
+          // Odd case — treat as real
+          real.push({ chi, idx: i });
+          used.add(i);
+        }
+      }
+    }
+    return { principal, complexPairs, real };
+  })();
+
+  $: realCharacters = charClassification.real;
+
+  $: realCharIdx = realCharacters.length > 0 ? realCharacters[0].idx : -1;
+  let selectedRealCharIdx = 0;
+  $: {
+    if (selectedRealCharIdx >= realCharacters.length) selectedRealCharIdx = 0;
+    realCharIdx = realCharacters[selectedRealCharIdx]?.idx ?? -1;
+  }
 
   // For each small prime, show the Euler factor and its series expansion
   $: realChar = realCharIdx >= 0 ? characters[realCharIdx] : null;
@@ -436,6 +485,52 @@
     </div>
   </div>
 
+  <h3>Sorting the characters</h3>
+
+  <p>To handle all characters, we split them into groups. The <strong>principal character</strong>
+  <Tex tex="\chi_0" /> gives us the pole. The rest fall into two camps:</p>
+
+  <div class="viz-container">
+    <h4>Characters mod {q} — sorted by type</h4>
+    <div class="char-sort">
+      <div class="char-sort-group principal-group">
+        <div class="csg-label">Principal (pole at s=1)</div>
+        {#each charClassification.principal as p}
+          <span class="csg-chip principal">{p.chi.label}</span>
+        {/each}
+      </div>
+
+      {#if charClassification.complexPairs.length > 0}
+        <div class="char-sort-group complex-group">
+          <div class="csg-label">Complex pairs (Case 1)</div>
+          {#each charClassification.complexPairs as pair}
+            <div class="csg-pair">
+              <span class="csg-chip complex">{pair.chi1.label}</span>
+              <span class="csg-conj">&#x2194;</span>
+              <span class="csg-chip complex">{pair.chi2.label}</span>
+            </div>
+          {/each}
+          <div class="csg-note">Each pair shares a zero — 2 zeros beat 1 pole</div>
+        </div>
+      {/if}
+
+      {#if charClassification.real.length > 0}
+        <div class="char-sort-group real-group">
+          <div class="csg-label">Real characters (Case 2)</div>
+          {#each charClassification.real as r}
+            <span class="csg-chip real">{r.chi.label}</span>
+          {/each}
+          <div class="csg-note">Self-conjugate — needs Landau's theorem</div>
+        </div>
+      {:else}
+        <div class="char-sort-group real-group">
+          <div class="csg-label">Real characters (Case 2)</div>
+          <div class="csg-note">None for q = {q}!</div>
+        </div>
+      {/if}
+    </div>
+  </div>
+
   <h3>Case 1: Complex characters — two zeros beat one pole</h3>
 
   <Callout>
@@ -560,32 +655,50 @@
   number. And it turns out that for real characters, <strong>these sums are always ≥ 0</strong>.
   You can verify it below — every coefficient is non-negative:</p>
 
-  {#if realChar}
-    <div class="viz-container">
-      <h4>The coefficients of ζ(s)·L(s, {realChar.label}) — all non-negative</h4>
-      <div class="coeff-grid">
-        {#each Array(20) as _, i}
-          {@const n = i + 1}
-          {@const an = (() => {
-            let dchi = 0;
-            for (let d = 1; d <= n; d++) {
-              if (n % d === 0) {
-                const chiD = realChar.values.get(d % q)?.[0] ?? 0;
-                dchi += chiD;
-              }
-            }
-            return dchi;
-          })()}
-          <div class="coeff-cell" class:zero={an === 0}>
-            <span class="coeff-n">a<sub>{n}</sub></span>
-            <span class="coeff-val">{an}</span>
-          </div>
+  <div class="viz-container">
+    <h4>The coefficients of ζ(s)·L(s, χ) — all non-negative</h4>
+
+    {#if realCharacters.length > 0}
+      <div class="coeff-controls">
+        <span class="coeff-control-label">Real character:</span>
+        {#each realCharacters as rc, i}
+          <button class="csg-chip real" class:active={selectedRealCharIdx === i}
+            on:click={() => selectedRealCharIdx = i}>
+            {rc.chi.label}
+          </button>
         {/each}
+        <span class="coeff-control-label" style="margin-left: 0.5em">q = {q}</span>
       </div>
-      <p class="ef-conclusion">Every coefficient is ≥ 0. The partial sums can only grow — they
-      never decrease. This is the property that Landau's theorem exploits.</p>
-    </div>
-  {/if}
+
+      {@const chi = characters[realCharIdx]}
+      {#if chi}
+        <div class="coeff-grid">
+          {#each Array(30) as _, i}
+            {@const n = i + 1}
+            {@const an = (() => {
+              let dchi = 0;
+              for (let d = 1; d <= n; d++) {
+                if (n % d === 0) {
+                  const chiD = chi.values.get(d % q)?.[0] ?? 0;
+                  dchi += chiD;
+                }
+              }
+              return dchi;
+            })()}
+            <div class="coeff-cell" class:zero={an === 0}>
+              <span class="coeff-n">a<sub>{n}</sub></span>
+              <span class="coeff-val">{an}</span>
+            </div>
+          {/each}
+        </div>
+        <p class="ef-conclusion">Every coefficient is ≥ 0. The partial sums can only grow — they
+        never decrease. Try changing q above to see different real characters.
+        This is the property that Landau's theorem exploits.</p>
+      {/if}
+    {:else}
+      <p class="ef-conclusion">No real non-principal characters for q = {q}. Try q = 4, 5, or 8.</p>
+    {/if}
+  </div>
 
   <h4>The trap snaps shut — Landau's theorem</h4>
 
@@ -1004,6 +1117,84 @@
   }
 
   .coeff-cell.zero .coeff-val { color: var(--color-text-light); }
+
+  .coeff-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    margin-bottom: 0.6em;
+    flex-wrap: wrap;
+  }
+
+  .coeff-control-label {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  .char-sort {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8em;
+    justify-content: center;
+  }
+
+  .char-sort-group {
+    padding: 0.6em 0.8em;
+    border-radius: 10px;
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .principal-group { background: rgba(212, 136, 15, 0.08); border: 1.5px solid var(--color-prime); }
+  .complex-group { background: rgba(99, 102, 241, 0.06); border: 1.5px solid #6366f1; }
+  .real-group { background: rgba(34, 197, 94, 0.06); border: 1.5px solid #22c55e; }
+
+  .csg-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.4em;
+  }
+
+  .principal-group .csg-label { color: var(--color-prime); }
+  .complex-group .csg-label { color: #6366f1; }
+  .real-group .csg-label { color: #22c55e; }
+
+  .csg-chip {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    padding: 0.2em 0.5em;
+    border-radius: 5px;
+    font-weight: 600;
+    cursor: default;
+    border: none;
+    background: transparent;
+  }
+
+  .csg-chip.principal { color: var(--color-prime); background: rgba(212, 136, 15, 0.12); }
+  .csg-chip.complex { color: #6366f1; background: rgba(99, 102, 241, 0.1); }
+  .csg-chip.real { color: #22c55e; background: rgba(34, 197, 94, 0.1); cursor: pointer; }
+  .csg-chip.real.active { background: #22c55e; color: white; }
+
+  .csg-pair {
+    display: flex;
+    align-items: center;
+    gap: 0.2em;
+    justify-content: center;
+    margin-bottom: 0.2em;
+  }
+
+  .csg-conj { color: #6366f1; font-size: 0.8rem; }
+
+  .csg-note {
+    font-size: 0.68rem;
+    color: var(--color-text-light);
+    margin-top: 0.3em;
+    font-style: italic;
+  }
 
   .landau-controls {
     display: flex;
