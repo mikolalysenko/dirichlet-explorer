@@ -185,6 +185,74 @@
     return String(n).split('').map(d => supD[parseInt(d)]).join('');
   }
 
+  // ── Landau's theorem visualization ─────────────────────────────
+  let landauMode = 'nonneg'; // 'nonneg' or 'alternating'
+  let landauN = 200;
+
+  // d(n) = number of divisors of n (non-negative coefficients, ζ(s)²)
+  function numDivisors(n) {
+    let count = 0;
+    for (let d = 1; d * d <= n; d++) {
+      if (n % d === 0) { count++; if (d !== n / d) count++; }
+    }
+    return count;
+  }
+
+  // Compute partial sums for a range of s values
+  $: landauCurves = (() => {
+    const sVals = [];
+    for (let i = 0; i <= 80; i++) sVals.push(0.5 + (i / 80) * 2.5); // 0.5 to 3
+
+    // Multiple N values to show convergence
+    const nValues = [20, 50, 100, Math.min(landauN, 500)];
+
+    return nValues.map(N => {
+      const pts = sVals.map(s => {
+        let sum = 0;
+        for (let n = 1; n <= N; n++) {
+          const coeff = landauMode === 'nonneg' ? numDivisors(n) : Math.pow(-1, n + 1);
+          sum += coeff * Math.pow(n, -s);
+        }
+        return { s, value: sum };
+      });
+      return { N, pts };
+    });
+  })();
+
+  const lPlotW = 520;
+  const lPlotH = 220;
+  const lM = { left: 50, right: 15, top: 15, bottom: 30 };
+  const lPW = lPlotW - lM.left - lM.right;
+  const lPH = lPlotH - lM.top - lM.bottom;
+
+  $: lXScale = (s) => lM.left + ((s - 0.5) / 2.5) * lPW;
+
+  $: lYMax = (() => {
+    const maxVal = Math.max(...landauCurves.flatMap(c => c.pts.filter(p => p.s > 0.7).map(p => Math.abs(p.value))));
+    return Math.min(30, Math.max(5, maxVal * 1.1));
+  })();
+  $: lYMin = landauMode === 'alternating' ? -1 : 0;
+  $: lYScale = (v) => lM.top + lPH - ((v - lYMin) / (lYMax - lYMin)) * lPH;
+
+  function lPath(pts) {
+    const segs = [];
+    let cur = [];
+    for (const p of pts) {
+      if (!isFinite(p.value) || Math.abs(p.value) > lYMax * 2) {
+        if (cur.length > 1) segs.push(cur);
+        cur = [];
+      } else {
+        cur.push(p);
+      }
+    }
+    if (cur.length > 1) segs.push(cur);
+    return segs.map(seg =>
+      seg.map((p, i) => `${i === 0 ? 'M' : 'L'}${lXScale(p.s)},${lYScale(p.value)}`).join(' ')
+    );
+  }
+
+  const lAlphas = [0.2, 0.35, 0.55, 1.0];
+
   let realS = 1.5;
 
   // Compute ζ(s)·L(s,χ) and the lower bound Σ 1/m^{2s} at sampled points
@@ -551,11 +619,89 @@
     <p>So: <strong>no singularity → the series converges everywhere to the right.</strong></p>
   </Callout>
 
+  <p>Try it below. Toggle between non-negative coefficients (which hit a wall at the singularity)
+  and alternating signs (which sneak past it):</p>
+
+  <div class="viz-container">
+    <h4>Landau's theorem — why non-negative series can't sneak past a singularity</h4>
+
+    <div class="landau-controls">
+      <div class="chart-toggle">
+        <button class:active={landauMode === 'nonneg'} on:click={() => landauMode = 'nonneg'}>
+          Non-negative (d(n), like ζ²)
+        </button>
+        <button class:active={landauMode === 'alternating'} on:click={() => landauMode = 'alternating'}>
+          Alternating ((−1)ⁿ⁺¹)
+        </button>
+      </div>
+      <Slider label="Max terms" bind:value={landauN} min={20} max={500} step={10} format={v => v} />
+    </div>
+
+    <svg viewBox="0 0 {lPlotW} {lPlotH}" preserveAspectRatio="xMidYMid meet" class="landau-plot">
+      <defs>
+        <clipPath id="l-clip"><rect x={lM.left} y={lM.top} width={lPW} height={lPH} /></clipPath>
+      </defs>
+
+      <!-- s=1 singularity marker -->
+      <line x1={lXScale(1)} y1={lM.top} x2={lXScale(1)} y2={lM.top + lPH}
+        stroke="var(--color-prime)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5" />
+      <text x={lXScale(1)} y={lM.top - 4} text-anchor="middle" font-size="8"
+        font-family="var(--font-mono)" fill="var(--color-prime)" font-weight="600">
+        singularity
+      </text>
+
+      <!-- y=0 line -->
+      {#if lYMin < 0}
+        <line x1={lM.left} y1={lYScale(0)} x2={lPlotW - lM.right} y2={lYScale(0)}
+          stroke="var(--color-border)" stroke-width="0.5" />
+      {/if}
+
+      <!-- Axes -->
+      <line x1={lM.left} y1={lM.top} x2={lM.left} y2={lM.top + lPH} stroke="var(--color-border)" stroke-width="1" />
+      <line x1={lM.left} y1={lM.top + lPH} x2={lPlotW - lM.right} y2={lM.top + lPH} stroke="var(--color-border)" stroke-width="1" />
+      <text x={lPlotW / 2} y={lPlotH - 4} text-anchor="middle" font-size="10" fill="var(--color-text-muted)">s</text>
+
+      <!-- Convergence zone labels -->
+      <text x={lXScale(2)} y={lM.top + 14} text-anchor="middle" font-size="8"
+        fill="#22c55e" font-family="var(--font-mono)">converges ✓</text>
+      {#if landauMode === 'nonneg'}
+        <text x={lXScale(0.75)} y={lM.top + 14} text-anchor="middle" font-size="8"
+          fill="#ef4444" font-family="var(--font-mono)">diverges ✗</text>
+      {:else}
+        <text x={lXScale(0.75)} y={lM.top + 14} text-anchor="middle" font-size="8"
+          fill="#22c55e" font-family="var(--font-mono)">still converges!</text>
+      {/if}
+
+      <!-- Curves for different N values (lighter = fewer terms) -->
+      <g clip-path="url(#l-clip)">
+        {#each landauCurves as curve, ci}
+          {#each lPath(curve.pts) as seg}
+            <path d={seg} fill="none"
+              stroke={landauMode === 'nonneg' ? 'var(--color-accent)' : '#14b8a6'}
+              stroke-width={ci === landauCurves.length - 1 ? 2.5 : 1.5}
+              opacity={lAlphas[ci]} />
+          {/each}
+        {/each}
+      </g>
+    </svg>
+
+    <div class="landau-readout">
+      {#if landauMode === 'nonneg'}
+        <p><strong>Non-negative coefficients:</strong> The partial sums march upward monotonically.
+        At <Tex tex="s = 1" /> (the singularity), they explode — and there's <em>no way</em> to extend
+        past it. The series is trapped behind the wall.</p>
+      {:else}
+        <p><strong>Alternating signs:</strong> The partial sums oscillate and can settle down
+        <em>even at s = 1 and below</em>, where ζ(s) has a pole. The cancellation between
+        positive and negative terms lets the series "reach past" the singularity.</p>
+      {/if}
+    </div>
+  </div>
+
   <p>If the pole at <Tex tex="s = 1" /> is cancelled (because <Tex tex="L(1,\chi) = 0" />),
-  there are no singularities for <Tex tex="s > 0" />. By Landau's theorem, the series
-  <Tex tex={String.raw`\sum a_n/n^s`} /> with its non-negative coefficients would have to
-  converge for <em>all</em> <Tex tex="s > 0" />. That sounds fine — until you look at what
-  the series actually contains...</p>
+  there are no singularities for <Tex tex="s > 0" />. By Landau's theorem, our non-negative series
+  <Tex tex={String.raw`\sum a_n/n^s`} /> would have to converge for <em>all</em> <Tex tex="s > 0" />.
+  That sounds fine — until you look at what the series actually contains...</p>
 
   <h4>Step 3: The explosion at s = ½</h4>
 
@@ -831,6 +977,25 @@
     color: var(--color-text-muted);
     text-align: center;
   }
+
+  .landau-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1em;
+    align-items: center;
+    margin-bottom: 0.5em;
+  }
+
+  .landau-plot { width: 100%; height: auto; }
+
+  .landau-readout {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    text-align: center;
+    margin-top: 0.3em;
+  }
+
+  .landau-readout p { margin: 0; }
 
   .real-plots {
     display: flex;
