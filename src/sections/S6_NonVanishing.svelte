@@ -231,6 +231,16 @@
     }).filter(f => f.chiP !== 0);
   })();
 
+  // Strip constants for character sorting visualization
+  const stripW = 400;
+  const stripH = 36;
+  const stripML = 40;
+  const stripMR = 8;
+  const stripInner = stripW - stripML - stripMR;
+  const stripCyS = stripH / 2;
+  const arrowRS = 12;
+  $: sxFn = (x) => stripML + (x / q) * stripInner;
+
   const supD = '⁰¹²³⁴⁵⁶⁷⁸⁹';
   function superscriptDigits(n) {
     return String(n).split('').map(d => supD[parseInt(d)]).join('');
@@ -496,6 +506,53 @@
     <h4>Characters mod {q} — sorted by type</h4>
     <Slider label="Modulus (q)" bind:value={q} min={3} max={12} />
 
+    <!-- Unified strip renderer for any character -->
+    {#snippet charStrip(chi, color, chiIdx)}
+      <svg viewBox="0 0 {stripW} {stripH}" preserveAspectRatio="xMidYMid meet" class="char-strip">
+        <!-- Center line -->
+        <line x1={stripML} y1={stripCyS} x2={stripW - stripMR} y2={stripCyS} stroke="var(--color-border-light)" stroke-width="0.5" />
+        <!-- ±1 guides -->
+        <line x1={stripML} y1={stripCyS - arrowRS} x2={stripW - stripMR} y2={stripCyS - arrowRS} stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="2,3" />
+        <line x1={stripML} y1={stripCyS + arrowRS} x2={stripW - stripMR} y2={stripCyS + arrowRS} stroke="var(--color-border-light)" stroke-width="0.3" stroke-dasharray="2,3" />
+        <!-- Label -->
+        <text x={4} y={stripCyS} dominant-baseline="central" font-size="10" font-family="var(--font-mono)" font-weight="600" fill={color}>{chi.label}</text>
+        <!-- Continuous traces (Im solid, Re dashed) -->
+        {#each [Array.from({length: 100}, (_, i) => {
+          const x = (i / 99) * q;
+          const freqs = contData.charFreqs[chiIdx];
+          let re = 1, im = 0;
+          if (freqs) {
+            for (let j = 0; j < freqs.length; j++) {
+              const angle = 2 * Math.PI * freqs[j] * x / contData.orders[j];
+              const c = Math.cos(angle), s = Math.sin(angle);
+              const nre = re * c - im * s;
+              im = re * s + im * c;
+              re = nre;
+            }
+          }
+          return { x: sxFn(x), re, im };
+        })] as contPts}
+          <path d={contPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${stripCyS - p.im * arrowRS}`).join(' ')}
+            fill="none" stroke={color} stroke-width="1" opacity="0.3" />
+          <path d={contPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${stripCyS - p.re * arrowRS}`).join(' ')}
+            fill="none" stroke={color} stroke-width="1" opacity="0.15" stroke-dasharray="2,2" />
+        {/each}
+        <!-- Discrete phasor arrows at coprime residues -->
+        {#each residues as r}
+          {@const v = chi.values.get(r) || [0, 0]}
+          {@const px = sxFn(r)}
+          <line x1={px} y1={stripCyS} x2={px + v[0] * arrowRS * 0.5} y2={stripCyS - v[1] * arrowRS * 0.5}
+            stroke={color} stroke-width="1.5" stroke-linecap="round" opacity="0.8" />
+          <circle cx={px + v[0] * arrowRS * 0.5} cy={stripCyS - v[1] * arrowRS * 0.5}
+            r="2" fill={color} />
+          <!-- Tick mark -->
+          <line x1={px} y1={stripCyS + arrowRS + 1} x2={px} y2={stripCyS + arrowRS + 4}
+            stroke="var(--color-text-light)" stroke-width="0.5" />
+          <text x={px} y={stripH - 1} text-anchor="middle" font-size="5" font-family="var(--font-mono)" fill="var(--color-text-light)">{r}</text>
+        {/each}
+      </svg>
+    {/snippet}
+
     <!-- Principal -->
     <div class="char-sort-section">
       <div class="css-header principal-header">
@@ -503,14 +560,9 @@
         <span class="css-tag">→ pole at s = 1</span>
       </div>
       {#each charClassification.principal as p}
-        <div class="css-values">
-          {#each residues as r}
-            {@const v = p.chi.values.get(r) || [0,0]}
-            <span class="css-val">{r}: <strong>+1</strong></span>
-          {/each}
-        </div>
+        {@render charStrip(p.chi, '#d4880f', p.idx)}
       {/each}
-      <p class="css-explain">Always +1 at coprime residues. Its L-function ≈ ζ(s), which has a pole at s=1.</p>
+      <p class="css-explain">Flat line at +1 for all coprime residues. Its L-function ≈ ζ(s) → pole at s=1.</p>
     </div>
 
     <!-- Complex pairs -->
@@ -522,41 +574,12 @@
         </div>
         {#each charClassification.complexPairs as pair}
           <div class="css-pair-block">
-            <div class="css-pair-row">
-              <span class="css-chi-label" style="color: #6366f1">{pair.chi1.label}</span>
-              <div class="css-values">
-                {#each residues as r}
-                  {@const v = pair.chi1.values.get(r) || [0,0]}
-                  <span class="css-val">
-                    <svg width="16" height="16" viewBox="0 0 16 16">
-                      <circle cx="8" cy="8" r="6" fill="none" stroke="#ddd" stroke-width="0.5" />
-                      <line x1="8" y1="8" x2={8 + v[0] * 5} y2={8 - v[1] * 5}
-                        stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" />
-                    </svg>
-                  </span>
-                {/each}
-              </div>
-            </div>
-            <div class="css-conj-arrow">↕ conjugate</div>
-            <div class="css-pair-row">
-              <span class="css-chi-label" style="color: #8b5cf6">{pair.chi2.label}</span>
-              <div class="css-values">
-                {#each residues as r}
-                  {@const v = pair.chi2.values.get(r) || [0,0]}
-                  <span class="css-val">
-                    <svg width="16" height="16" viewBox="0 0 16 16">
-                      <circle cx="8" cy="8" r="6" fill="none" stroke="#ddd" stroke-width="0.5" />
-                      <line x1="8" y1="8" x2={8 + v[0] * 5} y2={8 - v[1] * 5}
-                        stroke="#8b5cf6" stroke-width="1.5" stroke-linecap="round" />
-                    </svg>
-                  </span>
-                {/each}
-              </div>
-            </div>
+            {@render charStrip(pair.chi1, '#6366f1', pair.idx1)}
+            <div class="css-conj-arrow">↕ conjugate (mirrored)</div>
+            {@render charStrip(pair.chi2, '#8b5cf6', pair.idx2)}
           </div>
         {/each}
-        <p class="css-explain">Each pair has mirrored arrows (flipped imaginary part).
-        If one has L(1,χ) = 0, the other does too — giving 2 zeros against 1 pole.</p>
+        <p class="css-explain">Each pair has mirrored waves. If one has L(1,χ) = 0, the other does too — giving 2 zeros against 1 pole.</p>
       </div>
     {/if}
 
@@ -568,20 +591,9 @@
       </div>
       {#if charClassification.real.length > 0}
         {#each charClassification.real as rc}
-          <div class="css-pair-row">
-            <span class="css-chi-label" style="color: #22c55e">{rc.chi.label}</span>
-            <div class="css-values">
-              {#each residues as r}
-                {@const v = rc.chi.values.get(r) || [0,0]}
-                <span class="css-val real-val" class:plus={v[0] > 0.5} class:minus={v[0] < -0.5}>
-                  {v[0] > 0.5 ? '+1' : '−1'}
-                </span>
-              {/each}
-            </div>
-          </div>
+          {@render charStrip(rc.chi, '#22c55e', rc.idx)}
         {/each}
-        <p class="css-explain">Only ±1 values — equals its own conjugate, so a zero counts only once.
-        The pole/zero counting argument fails. We need a deeper tool.</p>
+        <p class="css-explain">Only ±1 values — equals its own conjugate, so a zero counts only once. The counting argument fails.</p>
       {:else}
         <p class="css-explain">No real non-principal characters for q = {q}. Try q = 4, 5, or 8.</p>
       {/if}
@@ -1344,6 +1356,13 @@
     font-size: 0.8rem;
     color: var(--color-text-muted);
     margin: 0.3em 0 0;
+  }
+
+  .char-strip {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: -0.1em 0;
   }
 
   .landau-controls {
