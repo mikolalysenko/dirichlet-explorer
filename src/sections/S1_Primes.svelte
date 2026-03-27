@@ -16,18 +16,18 @@
   $: productBig = euclidPrimes.reduce((a, b) => a * BigInt(b), 1n);
   $: plusOneBig = productBig + 1n;
 
-  // Format big numbers nicely
+  // Format BigInt with digit separators (no truncation, no Number conversion)
   function formatBig(n) {
     const s = n.toString();
-    if (s.length <= 15) return Number(n).toLocaleString();
-    // Show first 6 digits ... last 6 digits (N digits)
-    return `${s.slice(0, 6)}...${s.slice(-6)} (${s.length} digits)`;
+    // Add comma separators manually to avoid Number() overflow
+    return s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
   $: productStr = formatBig(productBig);
   $: plusOneStr = formatBig(plusOneBig);
-  $: isHuge = productBig.toString().length > 20;
-  $: isAbsurd = productBig.toString().length > 100;
+  $: numDigits = productBig.toString().length;
+  $: isHuge = numDigits > 20;
+  $: isAbsurd = numDigits > 100;
 
   // Track shake animation
   let shaking = false;
@@ -67,12 +67,7 @@
   $: plusOneFactors = factorizeSmart(plusOneBig, euclidPrimes);
 
   function formatFactor(f) {
-    if (typeof f === 'bigint') {
-      const s = f.toString();
-      if (s.length <= 12) return s;
-      return `${s.slice(0, 5)}...${s.slice(-5)}`;
-    }
-    return f.toLocaleString();
+    return formatBig(typeof f === 'bigint' ? f : BigInt(f));
   }
 
   $: newPrime = plusOneFactors.find(f => {
@@ -80,15 +75,20 @@
     return !euclidPrimes.includes(num);
   });
 
-  $: newPrimeIsBig = newPrime != null && (typeof newPrime === 'bigint' ? newPrime.toString().length > 12 : newPrime > 1e12);
+  $: newPrimeIsBig = newPrime != null && String(newPrime).length > 6;
+
+  $: canAddMore = newPrime != null && (typeof newPrime !== 'bigint' || newPrime <= BigInt(Number.MAX_SAFE_INTEGER));
 
   function addPrime() {
-    if (newPrime != null) {
-      const num = typeof newPrime === 'bigint' ? Number(newPrime) : newPrime;
-      if (!euclidPrimes.includes(num)) {
-        euclidPrimes = [...euclidPrimes, num].sort((a, b) => a - b);
-        if (productBig.toString().length > 30) triggerShake();
-      }
+    if (newPrime == null) return;
+    if (typeof newPrime === 'bigint' && newPrime > BigInt(Number.MAX_SAFE_INTEGER)) {
+      triggerShake();
+      return; // too big to add — the point is already made!
+    }
+    const num = typeof newPrime === 'bigint' ? Number(newPrime) : newPrime;
+    if (!euclidPrimes.includes(num)) {
+      euclidPrimes = [...euclidPrimes, num].sort((a, b) => a - b);
+      if (numDigits > 30) triggerShake();
     }
   }
 </script>
@@ -145,9 +145,13 @@
         {/if}
       {/if}
     </p>
-    {#if newPrime}
+    {#if newPrime && canAddMore}
       <button class="add-prime-btn" on:click={addPrime}>
         Add {formatFactor(newPrime)} to the list and try again
+      </button>
+    {:else if newPrime && !canAddMore}
+      <button class="add-prime-btn" on:click={triggerShake}>
+        The new prime has {String(newPrime).length} digits — we could keep going forever!
       </button>
     {/if}
     {#if isAbsurd}
@@ -157,7 +161,7 @@
       </p>
     {:else if isHuge}
       <p class="huge-note">
-        These numbers have {productBig.toString().length} digits — far beyond what any calculator can handle.
+        These numbers have {numDigits} digits — far beyond what any calculator can handle.
         But Euclid's argument doesn't care how big they get!
       </p>
     {/if}
@@ -217,12 +221,14 @@
   }
 
   .big-number-line {
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
     word-break: break-all;
+    line-height: 1.4;
   }
 
   .big-num {
-    font-size: 0.85em;
+    font-size: 0.8em;
+    font-family: var(--font-mono);
   }
 
   .big-prime-note {
