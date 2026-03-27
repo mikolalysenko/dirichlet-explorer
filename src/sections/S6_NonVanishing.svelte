@@ -12,52 +12,68 @@
 
   $: characters = dirichletCharacters(q);
 
-  // Compute the product of all L-functions at s
-  $: productValues = (() => {
-    const sVals = [];
-    for (let s = 1.05; s <= 4; s += 0.05) {
-      sVals.push(s);
-    }
+  const sMin = 1.005;
+  const sMaxPlot = 4;
+  const numPts = 100;
 
-    return sVals.map(s => {
-      let product = [1, 0];
-      for (const chi of characters) {
-        const l = lFunction(s, chi, 1000);
-        product = complexMul(product, l);
-      }
-      return { s, value: product[0] };
+  // Compute curves for each individual L-function AND the product
+  $: curveData = (() => {
+    const chars = dirichletCharacters(q);
+    const sVals = Array.from({ length: numPts }, (_, i) => {
+      const t = i / (numPts - 1);
+      return sMin + (sMaxPlot - sMin) * (t * t); // denser near sMin
     });
+
+    const individual = chars.map((chi, idx) => {
+      const points = sVals.map(s => ({ s, value: lFunction(s, chi, 1000)[0] }));
+      return { chi, points, idx };
+    });
+
+    const productPts = sVals.map((s, si) => {
+      let prod = 1;
+      for (const c of individual) prod *= c.points[si].value;
+      return { s, value: prod };
+    });
+
+    return { individual, productPts };
   })();
 
-  $: currentProduct = (() => {
-    let product = [1, 0];
-    for (const chi of characters) {
-      const l = lFunction(sValue, chi, 1000);
-      product = complexMul(product, l);
-    }
-    return product[0];
-  })();
-
-  // Visualize the tug of war
-  $: characterContributions = characters.map((chi, i) => {
-    const l = lFunction(sValue, chi, 1000);
-    return {
-      label: chi.label,
-      value: l[0],
-      isPrincipal: chi.isPrincipal,
-      logValue: chi.isPrincipal ? Math.log(complexAbs(l)) : Math.log(Math.max(0.01, complexAbs(l)))
-    };
+  // Current values at sValue
+  $: currentIndividual = characters.map((chi, i) => {
+    const l = lFunction(Math.max(sValue, sMin), chi, 1000);
+    return { label: chi.label, value: l[0], isPrincipal: chi.isPrincipal, idx: i };
   });
 
-  const plotWidth = 600;
-  const plotHeight = 200;
-  const margin = { left: 50, right: 20, top: 20, bottom: 40 };
+  $: currentProduct = currentIndividual.reduce((p, c) => p * c.value, 1);
+
+  // Adaptive y-axis: track the product at current s
+  $: yMax = Math.max(5, currentProduct * 1.3);
+
+  const plotWidth = 680;
+  const plotHeight = 240;
+  const margin = { left: 55, right: 20, top: 20, bottom: 40 };
   const pw = plotWidth - margin.left - margin.right;
   const ph = plotHeight - margin.top - margin.bottom;
 
-  $: yMax = Math.max(5, ...productValues.map(v => Math.min(20, v.value)));
-  $: xScale = (s) => margin.left + ((s - 1.05) / (4 - 1.05)) * pw;
-  $: yScale = (v) => margin.top + ph - (Math.min(v, yMax) / yMax) * ph;
+  $: xScale = (s) => margin.left + ((s - sMin) / (sMaxPlot - sMin)) * pw;
+  $: yScale = (v) => margin.top + ph - (v / yMax) * ph;
+
+  // Reactive path data
+  $: productPath = curveData.productPts.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'}${xScale(p.s)},${yScale(p.value)}`
+  ).join(' ');
+
+  $: individualPaths = curveData.individual.map(c =>
+    c.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xScale(p.s)},${yScale(p.value)}`).join(' ')
+  );
+
+  // Y-axis ticks
+  $: yTicks = (() => {
+    const step = yMax > 50 ? 20 : yMax > 20 ? 5 : yMax > 8 ? 2 : 1;
+    const ticks = [];
+    for (let v = 0; v <= yMax; v += step) ticks.push(v);
+    return ticks;
+  })();
 
   const charColors = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444'];
 </script>
@@ -92,17 +108,32 @@
   <div class="viz-container">
     <h4>Product of all L-functions mod {q}</h4>
     <Slider label="Modulus (q)" bind:value={q} min={3} max={7} />
-    <Slider label="s" bind:value={sValue} min={1.05} max={4} step={0.05} format={v => v.toFixed(2)} />
+    <Slider label="s" bind:value={sValue} min={1.0} max={4} step={0.01} format={v => v.toFixed(2)} />
 
     <svg viewBox="0 0 {plotWidth} {plotHeight}" preserveAspectRatio="xMidYMid meet" class="product-plot">
+      <defs>
+        <clipPath id="prod-clip-{q}">
+          <rect x={margin.left} y={margin.top} width={pw} height={ph} />
+        </clipPath>
+      </defs>
+
+      <!-- Grid -->
+      {#each yTicks as tick}
+        <line x1={margin.left} y1={yScale(tick)} x2={plotWidth - margin.right} y2={yScale(tick)}
+          stroke="var(--color-border-light)" stroke-width="0.5" />
+        <text x={margin.left - 6} y={yScale(tick)} text-anchor="end" dominant-baseline="central"
+          font-size="9" font-family="var(--font-mono)" fill="var(--color-text-light)">{tick}</text>
+      {/each}
+
       <!-- y=1 line -->
-      <line
-        x1={margin.left} y1={yScale(1)}
-        x2={plotWidth - margin.right} y2={yScale(1)}
-        stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="5,3" opacity="0.5"
-      />
-      <text x={margin.left - 5} y={yScale(1)} text-anchor="end" dominant-baseline="central"
-        font-size="10" font-family="var(--font-mono)" fill="var(--color-prime)">1</text>
+      <line x1={margin.left} y1={yScale(1)} x2={plotWidth - margin.right} y2={yScale(1)}
+        stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="5,3" opacity="0.5" />
+
+      <!-- s=1 pole marker -->
+      <line x1={xScale(1)} y1={margin.top} x2={xScale(1)} y2={margin.top + ph}
+        stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="4,3" opacity="0.4" />
+      <text x={xScale(1)} y={margin.top - 5} text-anchor="middle"
+        font-size="8" font-family="var(--font-mono)" fill="var(--color-prime)">s=1</text>
 
       <!-- Axes -->
       <line x1={margin.left} y1={margin.top} x2={margin.left} y2={margin.top + ph}
@@ -111,25 +142,51 @@
         stroke="var(--color-border)" stroke-width="1" />
       <text x={plotWidth / 2} y={plotHeight - 5} text-anchor="middle" font-size="11" fill="var(--color-text-muted)">s</text>
 
-      <!-- Product curve -->
-      <path
-        d={productValues.map((v, i) => `${i === 0 ? 'M' : 'L'}${xScale(v.s)},${yScale(Math.max(0, v.value))}`).join(' ')}
-        fill="none" stroke="var(--color-accent)" stroke-width="2.5"
-      />
+      <!-- Clipped curves -->
+      <g clip-path="url(#prod-clip-{q})">
+        <!-- Individual L-function curves (thin, colored) -->
+        {#each individualPaths as path, i}
+          <path d={path} fill="none"
+            stroke={charColors[i % charColors.length]}
+            stroke-width="1.2" opacity="0.4" />
+        {/each}
+
+        <!-- Product curve (thick) -->
+        <path d={productPath} fill="none" stroke="var(--color-accent)" stroke-width="2.5" />
+
+        <!-- Current value markers -->
+        {#each currentIndividual as cv, i}
+          <circle cx={xScale(Math.max(sValue, sMin))} cy={yScale(cv.value)}
+            r="3" fill={charColors[i % charColors.length]} stroke="white" stroke-width="1" />
+        {/each}
+        <circle cx={xScale(Math.max(sValue, sMin))} cy={yScale(currentProduct)}
+          r="5" fill="var(--color-accent)" stroke="white" stroke-width="2" />
+      </g>
 
       <!-- Current s marker -->
-      <line x1={xScale(sValue)} y1={margin.top} x2={xScale(sValue)} y2={margin.top + ph}
+      <line x1={xScale(Math.max(sValue, sMin))} y1={margin.top} x2={xScale(Math.max(sValue, sMin))} y2={margin.top + ph}
         stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
-      <circle cx={xScale(sValue)} cy={yScale(Math.max(0, Math.min(yMax, currentProduct)))}
-        r="5" fill="var(--color-accent)" stroke="white" stroke-width="2" />
     </svg>
 
-    <p class="product-value">
-      <Tex tex="\prod_\chi L({sValue.toFixed(2)}, \chi)" /> = <strong>{currentProduct.toFixed(3)}</strong>
-      {#if currentProduct >= 0.99}
-        <span class="check-yes">&ge; 1 &#10003;</span>
-      {/if}
-    </p>
+    <!-- Value readout: product + individual contributions -->
+    <div class="product-readout">
+      <div class="product-main">
+        <Tex tex={String.raw`\prod_\chi L(${sValue.toFixed(2)}, \chi)`} /> = <strong>{currentProduct > 10000 ? '∞' : currentProduct.toFixed(2)}</strong>
+        {#if currentProduct >= 0.99}
+          <span class="check-yes">&ge; 1 &#10003;</span>
+        {/if}
+      </div>
+      <div class="individual-values">
+        {#each currentIndividual as cv, i}
+          <span class="indiv-val" style="color: {charColors[i % charColors.length]}">
+            {cv.label} = {Math.abs(cv.value) > 10000 ? '∞' : cv.value.toFixed(2)}
+            {#if cv.isPrincipal && sValue < 1.3}
+              <span class="pole-tag">↑ pole</span>
+            {/if}
+          </span>
+        {/each}
+      </div>
+    </div>
   </div>
 
   <h3>The contradiction for complex characters</h3>
@@ -203,18 +260,16 @@
 </Section>
 
 <style>
-  .product-plot {
-    width: 100%;
-    height: auto;
-  }
+  .product-plot { width: 100%; height: auto; }
 
-  .product-value {
-    text-align: center;
+  .product-readout { text-align: center; margin-top: 0.5em; }
+
+  .product-main {
     font-size: 1rem;
-    margin-top: 0.5em;
+    margin-bottom: 0.3em;
   }
 
-  .product-value strong {
+  .product-main strong {
     font-family: var(--font-mono);
     color: var(--color-accent);
     font-size: 1.1rem;
@@ -224,6 +279,26 @@
     color: #22c55e;
     font-weight: 600;
     margin-left: 0.3em;
+  }
+
+  .individual-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .indiv-val { font-weight: 500; }
+
+  .pole-tag {
+    font-size: 0.65rem;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+    margin-left: 0.2em;
   }
 
   .tug-of-war {
