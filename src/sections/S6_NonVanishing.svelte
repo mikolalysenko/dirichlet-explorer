@@ -147,7 +147,9 @@
 
   // ── Real character: Euler factor visualization ──────────────
   import { zetaPartial } from '../lib/lfunctions.js';
-  import { gcd } from '../lib/math-utils.js';
+  import { gcd, coprimeResidues } from '../lib/math-utils.js';
+
+  $: residues = coprimeResidues(q);
   import { listPrimes } from '../lib/primes.js';
 
   // Classify all characters: principal, complex pairs, real
@@ -487,46 +489,101 @@
 
   <h3>Sorting the characters</h3>
 
-  <p>To handle all characters, we split them into groups. The <strong>principal character</strong>
-  <Tex tex="\chi_0" /> gives us the pole. The rest fall into two camps:</p>
+  <p>To handle all characters, we split them into groups based on their values.
+  Change <Tex tex="q" /> to see how the sorting changes:</p>
 
   <div class="viz-container">
     <h4>Characters mod {q} — sorted by type</h4>
-    <div class="char-sort">
-      <div class="char-sort-group principal-group">
-        <div class="csg-label">Principal (pole at s=1)</div>
-        {#each charClassification.principal as p}
-          <span class="csg-chip principal">{p.chi.label}</span>
-        {/each}
+    <Slider label="Modulus (q)" bind:value={q} min={3} max={12} />
+
+    <!-- Principal -->
+    <div class="char-sort-section">
+      <div class="css-header principal-header">
+        <span class="css-title">Principal character <Tex tex="\chi_0" /></span>
+        <span class="css-tag">→ pole at s = 1</span>
       </div>
+      {#each charClassification.principal as p}
+        <div class="css-values">
+          {#each residues as r}
+            {@const v = p.chi.values.get(r) || [0,0]}
+            <span class="css-val">{r}: <strong>+1</strong></span>
+          {/each}
+        </div>
+      {/each}
+      <p class="css-explain">Always +1 at coprime residues. Its L-function ≈ ζ(s), which has a pole at s=1.</p>
+    </div>
 
-      {#if charClassification.complexPairs.length > 0}
-        <div class="char-sort-group complex-group">
-          <div class="csg-label">Complex pairs (Case 1)</div>
-          {#each charClassification.complexPairs as pair}
-            <div class="csg-pair">
-              <span class="csg-chip complex">{pair.chi1.label}</span>
-              <span class="csg-conj">&#x2194;</span>
-              <span class="csg-chip complex">{pair.chi2.label}</span>
+    <!-- Complex pairs -->
+    {#if charClassification.complexPairs.length > 0}
+      <div class="char-sort-section">
+        <div class="css-header complex-header">
+          <span class="css-title">Complex conjugate pairs</span>
+          <span class="css-tag">→ Case 1: two zeros beat one pole</span>
+        </div>
+        {#each charClassification.complexPairs as pair}
+          <div class="css-pair-block">
+            <div class="css-pair-row">
+              <span class="css-chi-label" style="color: #6366f1">{pair.chi1.label}</span>
+              <div class="css-values">
+                {#each residues as r}
+                  {@const v = pair.chi1.values.get(r) || [0,0]}
+                  <span class="css-val">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                      <circle cx="8" cy="8" r="6" fill="none" stroke="#ddd" stroke-width="0.5" />
+                      <line x1="8" y1="8" x2={8 + v[0] * 5} y2={8 - v[1] * 5}
+                        stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                {/each}
+              </div>
             </div>
-          {/each}
-          <div class="csg-note">Each pair shares a zero — 2 zeros beat 1 pole</div>
-        </div>
-      {/if}
+            <div class="css-conj-arrow">↕ conjugate</div>
+            <div class="css-pair-row">
+              <span class="css-chi-label" style="color: #8b5cf6">{pair.chi2.label}</span>
+              <div class="css-values">
+                {#each residues as r}
+                  {@const v = pair.chi2.values.get(r) || [0,0]}
+                  <span class="css-val">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                      <circle cx="8" cy="8" r="6" fill="none" stroke="#ddd" stroke-width="0.5" />
+                      <line x1="8" y1="8" x2={8 + v[0] * 5} y2={8 - v[1] * 5}
+                        stroke="#8b5cf6" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                {/each}
+              </div>
+            </div>
+          </div>
+        {/each}
+        <p class="css-explain">Each pair has mirrored arrows (flipped imaginary part).
+        If one has L(1,χ) = 0, the other does too — giving 2 zeros against 1 pole.</p>
+      </div>
+    {/if}
 
+    <!-- Real characters -->
+    <div class="char-sort-section">
+      <div class="css-header real-header">
+        <span class="css-title">Real characters</span>
+        <span class="css-tag">→ Case 2: needs Landau's theorem</span>
+      </div>
       {#if charClassification.real.length > 0}
-        <div class="char-sort-group real-group">
-          <div class="csg-label">Real characters (Case 2)</div>
-          {#each charClassification.real as r}
-            <span class="csg-chip real">{r.chi.label}</span>
-          {/each}
-          <div class="csg-note">Self-conjugate — needs Landau's theorem</div>
-        </div>
+        {#each charClassification.real as rc}
+          <div class="css-pair-row">
+            <span class="css-chi-label" style="color: #22c55e">{rc.chi.label}</span>
+            <div class="css-values">
+              {#each residues as r}
+                {@const v = rc.chi.values.get(r) || [0,0]}
+                <span class="css-val real-val" class:plus={v[0] > 0.5} class:minus={v[0] < -0.5}>
+                  {v[0] > 0.5 ? '+1' : '−1'}
+                </span>
+              {/each}
+            </div>
+          </div>
+        {/each}
+        <p class="css-explain">Only ±1 values — equals its own conjugate, so a zero counts only once.
+        The pole/zero counting argument fails. We need a deeper tool.</p>
       {:else}
-        <div class="char-sort-group real-group">
-          <div class="csg-label">Real characters (Case 2)</div>
-          <div class="csg-note">None for q = {q}!</div>
-        </div>
+        <p class="css-explain">No real non-principal characters for q = {q}. Try q = 4, 5, or 8.</p>
       {/if}
     </div>
   </div>
@@ -1194,6 +1251,99 @@
     color: var(--color-text-light);
     margin-top: 0.3em;
     font-style: italic;
+  }
+
+  .char-sort-section {
+    margin-bottom: 1em;
+    border-radius: 10px;
+    padding: 0.6em 0.8em;
+    background: white;
+  }
+
+  .css-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    margin-bottom: 0.4em;
+    flex-wrap: wrap;
+  }
+
+  .css-title { font-weight: 600; font-size: 0.9rem; }
+  .css-tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.15em 0.5em;
+    border-radius: 4px;
+  }
+
+  .principal-header { border-left: 4px solid var(--color-prime); padding-left: 0.6em; }
+  .principal-header .css-title { color: var(--color-prime); }
+  .principal-header .css-tag { background: var(--color-prime-bg); color: var(--color-prime); }
+
+  .complex-header { border-left: 4px solid #6366f1; padding-left: 0.6em; }
+  .complex-header .css-title { color: #6366f1; }
+  .complex-header .css-tag { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+
+  .real-header { border-left: 4px solid #22c55e; padding-left: 0.6em; }
+  .real-header .css-title { color: #22c55e; }
+  .real-header .css-tag { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+
+  .css-pair-block {
+    margin: 0.3em 0;
+    padding: 0.3em 0;
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .css-pair-block:last-child { border-bottom: none; }
+
+  .css-pair-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0.2em 0;
+  }
+
+  .css-chi-label {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    min-width: 28px;
+  }
+
+  .css-values {
+    display: flex;
+    gap: 0.2em;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .css-val {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+  }
+
+  .css-val.real-val {
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: 0.75rem;
+  }
+
+  .css-val.plus { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+  .css-val.minus { background: rgba(239, 68, 68, 0.08); color: #ef4444; }
+
+  .css-conj-arrow {
+    text-align: center;
+    font-size: 0.65rem;
+    color: #8b5cf6;
+    margin: 0.1em 0 0.1em 28px;
+  }
+
+  .css-explain {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin: 0.3em 0 0;
   }
 
   .landau-controls {
