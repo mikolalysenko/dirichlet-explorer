@@ -493,7 +493,7 @@
     <strong>as long as <Tex tex={String.raw`L(1, \chi) \neq 0`} /></strong> — because
     <Tex tex={String.raw`\log L(s,\chi)`} /> stays finite when <Tex tex={String.raw`L(1,\chi)`} /> is a nonzero finite number.
     So the whole sum diverges — meaning <strong>infinitely many primes</strong> in every coprime column!</p>
-    <p>Everything hinges on one question: can <Tex tex={String.raw`L(1, \chi)`} /> ever be zero?</p>
+    <p><strong>Everything hinges on one question: can <Tex tex={String.raw`L(1, \chi)`} /> ever be zero?</strong></p>
   </Callout>
 
 </Section>
