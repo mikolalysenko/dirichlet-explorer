@@ -6,6 +6,7 @@
   import LFunctionPlot from '../components/viz/LFunctionPlot.svelte';
   import EulerProductViz from '../components/viz/EulerProductViz.svelte';
   import EulerSieveViz from '../components/viz/EulerSieveViz.svelte';
+  import EulerMultiplyViz from '../components/viz/EulerMultiplyViz.svelte';
   import { zetaPartial } from '../lib/lfunctions.js';
   import { listPrimes } from '../lib/primes.js';
 
@@ -210,6 +211,15 @@
   are 2 and 3: <span class="number">1, 2, 3, 4, 6, 8, 9, 12, 16, 18, 24, 27, ...</span></p>
 
   <p>Crucially, each integer appears <strong>exactly once</strong>, because the exponents <Tex tex="(a, b)" /> are unique — this is the fundamental theorem of arithmetic!</p>
+
+  <p>Try it below — add primes one at a time and see how the multiplication table expands.
+  The columns are the terms you already have; the rows are powers of the new prime.
+  Each cell is one product. The sorted list at the bottom shows every integer generated.</p>
+
+  <div class="viz-container">
+    <h4>Multiplying geometric series — add primes step by step</h4>
+    <EulerMultiplyViz />
+  </div>
 
   <h4>Step 3: Keep multiplying — every integer appears</h4>
 
