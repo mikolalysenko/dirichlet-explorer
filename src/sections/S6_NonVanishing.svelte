@@ -86,26 +86,30 @@
   const pzM = { left: 50, right: 15, top: 15, bottom: 35 };
   const pzPW = pzPlotW - pzM.left - pzM.right;
   const pzPH = pzPlotH - pzM.top - pzM.bottom;
-  const pzYMax = 5;
 
-  $: pzXScale = (s) => pzM.left + ((s - 0.5) / 2.5) * pzPW; // s from 0.5 to 3
-  $: pzYScale = (v) => pzM.top + pzPH - (Math.max(-1, Math.min(v, pzYMax)) / (pzYMax + 1)) * pzPH;
+  // Fixed y range: -2 to 6, no clamping
+  const pzYMin = -2;
+  const pzYMaxV = 6;
 
-  // f(s) = (s-1)^(zeros - poles) near s=1
-  // More precisely: f(s) = 1/(s-1)^poles * (s-1)^zeros * C = C * (s-1)^(zeros-poles)
+  const pzXMin = -0.5;
+  const pzXMax = 3;
+  $: pzXScale = (s) => pzM.left + ((s - pzXMin) / (pzXMax - pzXMin)) * pzPW;
+  $: pzYScale = (v) => pzM.top + pzPH - ((v - pzYMin) / (pzYMaxV - pzYMin)) * pzPH;
+
+  $: pzExp = numZeros - numPoles;
+
   $: pzCurve = (() => {
     const pts = [];
-    const exp = numZeros - numPoles;
-    for (let i = 0; i <= 200; i++) {
-      const s = 0.5 + (i / 200) * 2.5; // 0.5 to 3
+    const exp = pzExp;
+    for (let i = 0; i <= 300; i++) {
+      const s = pzXMin + (i / 300) * (pzXMax - pzXMin);
       const d = s - 1;
       let val;
-      if (Math.abs(d) < 0.001) {
-        val = exp > 0 ? 0 : exp < 0 ? 1000 : 1;
+      if (Math.abs(d) < 0.002) {
+        val = exp > 0 ? 0 : exp < 0 ? (d > 0 ? 500 : -500) : 1;
       } else if (d > 0) {
         val = Math.pow(d, exp);
       } else {
-        // For s < 1, (s-1) is negative. |s-1|^exp with sign.
         val = Math.pow(Math.abs(d), exp) * (exp % 2 === 0 ? 1 : -1);
       }
       pts.push({ s, value: val });
@@ -118,11 +122,19 @@
   ).join(' ');
 
   $: pzBehavior = (() => {
-    const diff = numZeros - numPoles;
-    if (diff > 0) return { label: `→ 0 (zeros win)`, color: '#3b82f6', goesTo: 0 };
-    if (diff < 0) return { label: `→ ∞ (pole wins)`, color: '#ef4444', goesTo: Infinity };
-    return { label: `→ finite (balanced)`, color: '#22c55e', goesTo: 1 };
+    if (pzExp > 0) return { label: '→ 0 (zeros win)', color: '#3b82f6' };
+    if (pzExp < 0) return { label: '→ ∞ (pole wins)', color: '#ef4444' };
+    return { label: '→ finite (balanced)', color: '#22c55e' };
   })();
+
+  const supDigitsLocal = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+  function pzFormulaText(poles, zeros) {
+    const exp = zeros - poles;
+    if (exp === 0) return 'f(s) ~ constant';
+    if (exp > 0) return `f(s) ~ (s−1)${exp > 1 ? supDigitsLocal[exp] : ''}`;
+    if (exp === -1) return 'f(s) ~ 1/(s−1)';
+    return `f(s) ~ 1/(s−1)${supDigitsLocal[-exp]}`;
+  }
 
   // ── Visualization 2: Real character — ζ(s)L(s,χ) divergence ──
   // Compute ζ(s)*L(s,χ_real) via partial sums with non-negative coefficients
@@ -344,8 +356,8 @@
         <button class="pz-btn" on:click={() => numZeros = Math.min(4, numZeros + 1)}>+</button>
       </div>
       <span class="pz-formula">
-        f(s) ~ (s−1){numZeros - numPoles !== 0 ? (numZeros - numPoles > 0 ? `${'⁰¹²³⁴'[numZeros - numPoles] || ''}` : '') : '⁰'} {#if numZeros - numPoles < 0}/ (s−1){'⁰¹²³⁴'[numPoles - numZeros] || ''}{/if}
-        → <strong style="color: {pzBehavior.color}">{pzBehavior.label}</strong>
+        {pzFormulaText(numPoles, numZeros)}
+        &nbsp;<strong style="color: {pzBehavior.color}">{pzBehavior.label}</strong>
       </span>
     </div>
 
@@ -354,29 +366,37 @@
         <clipPath id="pz-clip"><rect x={pzM.left} y={pzM.top} width={pzPW} height={pzPH} /></clipPath>
       </defs>
 
-      <!-- y=1 lower bound -->
-      <line x1={pzM.left} y1={pzYScale(1)} x2={pzPlotW - pzM.right} y2={pzYScale(1)}
-        stroke="var(--color-prime)" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.5" />
-      <text x={pzPlotW - pzM.right + 2} y={pzYScale(1)} font-size="9" font-family="var(--font-mono)"
-        fill="var(--color-prime)" dominant-baseline="central">≥ 1</text>
-
-      <!-- y=0 -->
-      <line x1={pzM.left} y1={pzYScale(0)} x2={pzPlotW - pzM.right} y2={pzYScale(0)}
-        stroke="var(--color-border)" stroke-width="0.5" />
+      <!-- Horizontal grid lines -->
+      {#each [-1, 0, 1, 2, 3, 4, 5, 6] as tick}
+        {#if tick >= pzYMin && tick <= pzYMaxV}
+          <line x1={pzM.left} y1={pzYScale(tick)} x2={pzPlotW - pzM.right} y2={pzYScale(tick)}
+            stroke={tick === 1 ? 'var(--color-prime)' : 'var(--color-border-light)'}
+            stroke-width={tick === 1 ? 1.5 : 0.5}
+            stroke-dasharray={tick === 1 ? '5,3' : 'none'}
+            opacity={tick === 1 ? 0.6 : 0.5} />
+          <text x={pzM.left - 6} y={pzYScale(tick)} text-anchor="end" dominant-baseline="central"
+            font-size="9" font-family="var(--font-mono)"
+            fill={tick === 1 ? 'var(--color-prime)' : 'var(--color-text-light)'}>
+            {tick}{tick === 1 ? ' ≥1' : ''}
+          </text>
+        {/if}
+      {/each}
 
       <!-- Axes -->
-      <line x1={pzM.left} y1={pzM.top} x2={pzM.left} y2={pzM.top + pzPH} stroke="var(--color-border)" stroke-width="1" />
-      <line x1={pzM.left} y1={pzM.top + pzPH} x2={pzPlotW - pzM.right} y2={pzM.top + pzPH} stroke="var(--color-border)" stroke-width="1" />
+      <line x1={pzM.left} y1={pzYScale(0)} x2={pzPlotW - pzM.right} y2={pzYScale(0)}
+        stroke="var(--color-border)" stroke-width="1" />
+      <line x1={pzXScale(0)} y1={pzM.top} x2={pzXScale(0)} y2={pzM.top + pzPH}
+        stroke="var(--color-border)" stroke-width="0.5" opacity="0.3" />
       <text x={pzPlotW / 2} y={pzPlotH - 4} text-anchor="middle" font-size="10" fill="var(--color-text-muted)">s</text>
 
       <!-- s=1 marker -->
       <line x1={pzXScale(1)} y1={pzM.top} x2={pzXScale(1)} y2={pzM.top + pzPH}
-        stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="3,3" opacity="0.4" />
+        stroke="var(--color-prime)" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.5" />
       <text x={pzXScale(1)} y={pzM.top + pzPH + 12} text-anchor="middle" font-size="8"
         font-family="var(--font-mono)" fill="var(--color-prime)">s = 1</text>
 
-      <!-- Shaded violation region below y=1 -->
-      <rect x={pzM.left} y={pzYScale(1)} width={pzPW} height={pzYScale(0) - pzYScale(1)}
+      <!-- Shaded violation region: below y=1, right of s=1 -->
+      <rect x={pzXScale(1)} y={pzYScale(1)} width={pzXScale(pzXMax) - pzXScale(1)} height={pzYScale(0) - pzYScale(1)}
         fill="#ef4444" opacity="0.04" />
 
       <g clip-path="url(#pz-clip)">
