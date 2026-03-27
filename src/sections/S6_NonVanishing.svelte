@@ -405,26 +405,38 @@
   $: realityPaths = rPath(realCurveData.reality);
   $: lowerBoundPaths = rPath(realCurveData.lowerBound);
 
-  // Compute the lower bound directly at any s (fast — just a sum)
+  // Compute the lower bound directly at any s using more terms near s=0.5
   $: currentLB = (() => {
+    const N = realS < 0.6 ? 5000 : realS < 0.8 ? 2000 : 500;
     let sum = 0;
-    for (let m = 1; m <= 300; m++) {
-      if (gcd(m, q) === 1) sum += Math.pow(m, -2 * Math.max(realS, 0.51));
+    for (let m = 1; m <= N; m++) {
+      if (gcd(m, q) === 1) sum += Math.pow(m, -2 * Math.max(realS, 0.501));
     }
     return sum;
   })();
 
-  // Adaptive y-max for the lower bound chart — tracks the value at current s
-  $: lbYMax = Math.max(5, currentLB * 1.3);
+  // Adaptive y-max: scale starts expanding early (around s=1.2) and grows fast
+  // Use a stepped approach so the zoom-out is visible
+  $: lbYMax = (() => {
+    if (realS > 1.5) return 5;
+    if (realS > 1.2) return 10;
+    if (realS > 1.0) return 20;
+    if (realS > 0.8) return 50;
+    if (realS > 0.7) return 100;
+    if (realS > 0.6) return 500;
+    return Math.max(1000, currentLB * 1.1);
+  })();
   $: lbYScale = (v) => lM.top + lPH - (v / lbYMax) * lPH;
 
-  // Lower bound curve recomputed with extended range
+  // Lower bound curve recomputed with extended range, denser near s=0.5
   $: lbCurve = (() => {
     const pts = [];
-    for (let i = 0; i <= 150; i++) {
-      const s = 0.51 + (i / 150) * 2.99; // 0.51 to 3.5
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200;
+      const s = 0.501 + t * t * 2.999; // quadratic: denser near 0.5
+      const N = s < 0.6 ? 3000 : s < 0.8 ? 1000 : 300;
       let sum = 0;
-      for (let m = 1; m <= 300; m++) {
+      for (let m = 1; m <= N; m++) {
         if (gcd(m, q) === 1) sum += Math.pow(m, -2 * s);
       }
       pts.push({ s, value: sum });
@@ -856,7 +868,7 @@
   {#if realCharIdx >= 0}
     <div class="viz-container">
       <h4>Σ 1/m²ˢ explodes at s = ½</h4>
-      <Slider label="s" bind:value={realS} min={0.52} max={3} step={0.01} format={v => v.toFixed(2)} />
+      <Slider label="s" bind:value={realS} min={0.50} max={3} step={0.01} format={v => v.toFixed(2)} />
 
       <svg viewBox="0 0 {lPlotW} {lPlotH}" preserveAspectRatio="xMidYMid meet" class="landau-plot">
         <defs>
