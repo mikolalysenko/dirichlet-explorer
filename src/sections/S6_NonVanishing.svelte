@@ -310,31 +310,27 @@
 
   <h3>The contradiction for complex characters</h3>
 
-  <p>The principal character <Tex tex="\chi_0" /> contributes a <strong>pole</strong> (explosion) at
-  <Tex tex="s = 1" /> — one simple pole pushing the product toward infinity.</p>
+  <p>Quick vocabulary: a <strong>pole</strong> is a point where a function blows up to infinity
+  (like <Tex tex={String.raw`\frac{1}{s-1}`} /> at <Tex tex="s = 1" />). A <strong>zero</strong> is where
+  it hits 0 (like <Tex tex="(s-1)" /> at <Tex tex="s = 1" />). When you multiply functions together,
+  poles and zeros can cancel: a pole times a zero gives something finite.</p>
 
-  <p>Now suppose some complex character <Tex tex="\chi_1" /> had <Tex tex="L(1, \chi_1) = 0" />.
+  <p>We know the product <Tex tex={String.raw`\prod_\chi L(s,\chi)`} /> has exactly <strong>one pole</strong>
+  at <Tex tex="s = 1" />, coming from the principal character <Tex tex="\chi_0" />.
+  Now suppose some complex character <Tex tex="\chi_1" /> had <Tex tex="L(1, \chi_1) = 0" />.
   Since <Tex tex="\chi_1" /> is complex, its conjugate <Tex tex={String.raw`\overline{\chi_1}`} /> is a
-  different character, and it would also have <Tex tex={String.raw`L(1, \overline{\chi_1}) = 0`} />.
-  That's <strong>two zeros</strong>.</p>
+  <em>different</em> character, and it would also have <Tex tex={String.raw`L(1, \overline{\chi_1}) = 0`} />.
+  That gives <strong>two zeros</strong> against just one pole.</p>
 
-  <div class="tug-of-war">
-    <div class="tow-side pole-side">
-      <div class="tow-label">1 pole from <Tex tex="\chi_0" /></div>
-      <div class="tow-arrow">&#x2191; Pushes UP</div>
-    </div>
-    <div class="tow-vs">vs</div>
-    <div class="tow-side zero-side">
-      <div class="tow-label">2 zeros from <Tex tex={String.raw`\chi_1, \overline{\chi_1}`} /></div>
-      <div class="tow-arrow">&#x2193; Pushes DOWN</div>
-    </div>
-  </div>
+  <p>Near <Tex tex="s = 1" />, the product would behave like:</p>
 
-  <p>Near <Tex tex="s = 1" />, the pole makes its factor behave like <Tex tex={String.raw`\frac{1}{s-1}`} />,
-  while each zero contributes a factor of <Tex tex="(s-1)" />. Drag the slider to see what happens:</p>
+  <Tex display tex={String.raw`\underbrace{\frac{1}{s-1}}_{\text{1 pole}} \times \underbrace{(s-1)^2}_{\text{2 zeros}} \times (\text{finite}) = (s-1) \times (\text{finite}) \to 0`} />
+
+  <p>The blue curve below shows this net result — drag <Tex tex="s" /> toward 1 and watch it
+  drop below the gold ≥ 1 line:</p>
 
   <div class="viz-container">
-    <h4>Pole vs. zeros — what would happen if L(1,χ₁) = 0</h4>
+    <h4>What would happen if <Tex tex="L(1, \chi_1) = 0" />?</h4>
     <Slider label="s" bind:value={contradictionS} min={1.01} max={2.5} step={0.01} format={v => v.toFixed(2)} />
 
     <svg viewBox="0 0 {cPlotW} {cPlotH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
@@ -360,12 +356,11 @@
       <!-- s=1 marker -->
       <line x1={cXScale(1)} y1={cM.top} x2={cXScale(1)} y2={cM.top + cPH}
         stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="3,3" opacity="0.4" />
+      <text x={cXScale(1)} y={cM.top + cPH + 12} text-anchor="middle" font-size="8"
+        font-family="var(--font-mono)" fill="var(--color-prime)">s = 1</text>
 
       <g clip-path="url(#c-clip)">
-        <!-- 1/(s-1) pole curve -->
-        <path d={cPolePath} fill="none" stroke="#ef4444" stroke-width="2" opacity="0.7" />
-
-        <!-- Net result: (s-1) → 0 -->
+        <!-- Net result: (s-1) → 0 (the hypothetical product behavior) -->
         <path d={cNetPath} fill="none" stroke="var(--color-accent)" stroke-width="2.5" />
       </g>
 
@@ -373,30 +368,46 @@
       <line x1={cXScale(contradictionS)} y1={cM.top} x2={cXScale(contradictionS)} y2={cM.top + cPH}
         stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
 
-      <!-- Current value dots -->
-      {#if cCurrentPole < cYMax}
-        <circle cx={cXScale(contradictionS)} cy={cYScale(cCurrentPole)} r="4" fill="#ef4444" stroke="white" stroke-width="1.5" />
-      {/if}
+      <!-- Current value dot -->
       <circle cx={cXScale(contradictionS)} cy={cYScale(cCurrentNet)} r="5" fill="var(--color-accent)" stroke="white" stroke-width="2" />
+
+      <!-- Shaded violation region below y=1 -->
+      <rect x={cM.left} y={cYScale(1)} width={cPW} height={cYScale(0) - cYScale(1)}
+        fill="#ef4444" opacity="0.05" />
     </svg>
 
     <div class="contradiction-readout">
-      <span class="c-item" style="color: #ef4444">1/(s−1) = {cCurrentPole > 1000 ? '∞' : cCurrentPole.toFixed(1)} <span class="c-tag pole">pole ↑</span></span>
-      <span class="c-item" style="color: var(--color-accent)">(s−1)²/(s−1) = (s−1) = <strong>{cCurrentNet.toFixed(3)}</strong>
+      <span class="c-item" style="color: var(--color-accent)">
+        Product ≈ (s−1) = <strong>{cCurrentNet.toFixed(3)}</strong>
         {#if cCurrentNet < 1}
-          <span class="c-tag violation">{'<'} 1 — contradiction!</span>
+          <span class="c-tag violation">{'<'} 1 — violates the lower bound!</span>
+        {:else}
+          <span class="c-tag" style="background: rgba(34,197,94,0.1); color: #22c55e">≥ 1 ✓</span>
         {/if}
       </span>
     </div>
   </div>
 
-  <p>The net result (blue curve) is forced toward 0 as <Tex tex="s \to 1" /> — it drops below 1,
-  violating the lower bound we proved. <strong>Contradiction!</strong></p>
+  <div class="tug-of-war">
+    <div class="tow-side pole-side">
+      <div class="tow-label">1 pole from <Tex tex="\chi_0" /></div>
+      <div class="tow-arrow">&#x2191; Pushes UP</div>
+    </div>
+    <div class="tow-vs">vs</div>
+    <div class="tow-side zero-side">
+      <div class="tow-label">2 zeros from <Tex tex={String.raw`\chi_1, \overline{\chi_1}`} /></div>
+      <div class="tow-arrow">&#x2193; Pushes DOWN</div>
+    </div>
+  </div>
+
+  <p>Two zeros overpower one pole: the product is forced toward 0, dropping below 1.
+  But we proved the product is <strong>always &ge; 1</strong>. <strong>Contradiction!</strong>
+  So no complex character can have <Tex tex="L(1, \chi) = 0" />.</p>
 
   <Callout type="insight">
     <p><strong>For complex characters:</strong> <Tex tex="L(1, \chi) \neq 0" /> because a zero
-    would always come in pairs (with the conjugate), creating two zeros that overpower
-    the single pole — impossible when the product must stay &ge; 1.</p>
+    always comes in a conjugate pair — two zeros against one pole. The product
+    would be forced below 1, contradicting the non-negative coefficient lower bound.</p>
   </Callout>
 
   <h3>The subtle case: real characters</h3>
