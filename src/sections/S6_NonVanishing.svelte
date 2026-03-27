@@ -527,18 +527,35 @@
     </div>
   {/if}
 
-  <h4>Step 2: The trap</h4>
+  <h4>Step 2: The trap — Landau's theorem</h4>
 
   <p>Normally, <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> has a pole at <Tex tex="s = 1" />
   (from <Tex tex={String.raw`\zeta`} />). The series <Tex tex={String.raw`\sum a_n/n^s`} /> converges for
-  <Tex tex="s > 1" /> and diverges at <Tex tex="s = 1" />. That's fine — the pole is the boundary.</p>
+  <Tex tex="s > 1" /> and blows up at <Tex tex="s = 1" />. The pole marks the boundary where
+  the series stops converging.</p>
 
   <p>But <strong>if <Tex tex="L(1, \chi) = 0" /></strong>, the zero would cancel the pole.
-  The function would be smooth (no singularity) for all <Tex tex="s > 0" />.
-  <strong>Landau's theorem</strong> says: if a Dirichlet series <Tex tex={String.raw`\sum a_n/n^s`} /> has all
-  <Tex tex={String.raw`a_n \ge 0`} />, and the function it defines has no singularities for <Tex tex="s > \sigma" />,
-  then the series converges for all <Tex tex="s > \sigma" />.
-  So with no singularity anywhere for <Tex tex="s > 0" />, the series would converge for <em>all</em> <Tex tex="s > 0" />.</p>
+  The function would be smooth — no singularity anywhere for <Tex tex="s > 0" />.
+  And here's where the trap snaps shut.</p>
+
+  <Callout>
+    <p><strong>Landau's theorem:</strong> If a series <Tex tex={String.raw`\sum a_n / n^s`} /> has all
+    non-negative coefficients (<Tex tex={String.raw`a_n \ge 0`} />), then the boundary where
+    it stops converging <em>must</em> be a singularity of the function.</p>
+    <p><strong>Why?</strong> Think about it intuitively: with non-negative terms, the partial sums
+    can only grow. The series can't "accidentally" diverge at some point where the function
+    is perfectly smooth — there's no cancellation between terms that could cause a hidden blowup.
+    If the function is well-behaved at some point, the series must converge there too.
+    The <em>only</em> thing that can stop a non-negative series from converging is an actual
+    singularity (pole or branch point) in the function.</p>
+    <p>So: <strong>no singularity → the series converges everywhere to the right.</strong></p>
+  </Callout>
+
+  <p>If the pole at <Tex tex="s = 1" /> is cancelled (because <Tex tex="L(1,\chi) = 0" />),
+  there are no singularities for <Tex tex="s > 0" />. By Landau's theorem, the series
+  <Tex tex={String.raw`\sum a_n/n^s`} /> with its non-negative coefficients would have to
+  converge for <em>all</em> <Tex tex="s > 0" />. That sounds fine — until you look at what
+  the series actually contains...</p>
 
   <h4>Step 3: The explosion at s = ½</h4>
 
