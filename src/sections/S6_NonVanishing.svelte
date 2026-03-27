@@ -415,17 +415,8 @@
     return sum;
   })();
 
-  // Adaptive y-max: scale starts expanding early (around s=1.2) and grows fast
-  // Use a stepped approach so the zoom-out is visible
-  $: lbYMax = (() => {
-    if (realS > 1.5) return 5;
-    if (realS > 1.2) return 10;
-    if (realS > 1.0) return 20;
-    if (realS > 0.8) return 50;
-    if (realS > 0.7) return 100;
-    if (realS > 0.6) return 500;
-    return Math.max(1000, currentLB * 1.1);
-  })();
+  // Adaptive y-max: smoothly tracks the current value with headroom
+  $: lbYMax = Math.max(5, currentLB * 1.3);
   $: lbYScale = (v) => lM.top + lPH - (v / lbYMax) * lPH;
 
   // Lower bound curve recomputed with extended range, denser near s=0.5
