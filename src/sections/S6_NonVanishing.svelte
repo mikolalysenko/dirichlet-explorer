@@ -798,171 +798,73 @@
 
   <h4>The trap snaps shut</h4>
 
-  <p>Normally, <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> has a pole at <Tex tex="s = 1" />.
-  The series converges for <Tex tex="s > 1" /> and the pole is the wall — the boundary where
-  it stops converging. That's fine.</p>
+  <p>Here's the argument in three lines:</p>
 
-  <p>But <strong>if <Tex tex="L(1, \chi) = 0" /></strong>, the zero cancels the pole. No wall.
-  The function is smooth for all <Tex tex="s > 0" />.</p>
+  <ol class="trap-steps">
+    <li>The series <Tex tex={String.raw`\sum a_n/n^s`} /> has <strong>all non-negative coefficients</strong>
+    and a <strong>pole at s = 1</strong> (from ζ). The pole is a wall — the series converges for s &gt; 1 and diverges at s = 1.</li>
+    <li><strong>If <Tex tex="L(1, \chi) = 0" /></strong>, the zero cancels the pole. <strong>No wall.</strong>
+    Since all coefficients are ≥ 0, the partial sums can only grow — they never decrease.
+    With no wall to stop them, the series would have to converge for <em>all</em> s &gt; 0.</li>
+    <li>But the series contains <Tex tex={String.raw`\sum 1/m^{2s}`} /> (for coprime m), which at s = ½
+    becomes <Tex tex={String.raw`\sum 1/m = \infty`} /> — the <strong>harmonic series</strong>, which we already
+    know diverges. A convergent series can't have a divergent part. <strong>Contradiction!</strong></li>
+  </ol>
 
-  <p>Here's why that's a disaster for a non-negative series: when all the terms are ≥ 0,
-  the partial sums can only grow — they march upward monotonically. There's no cancellation
-  between positive and negative terms that could let the series "sneak past" a problem point.
-  So if the function is smooth at some value of <Tex tex="s" />, the series <em>must</em>
-  converge there. <strong>No singularity means the series converges everywhere.</strong></p>
-
-  <p>Try it below. Toggle between non-negative coefficients (which hit a wall at the singularity)
-  and alternating signs (which sneak past it):</p>
-
-  <div class="viz-container">
-    <h4>Why non-negative series can't sneak past a singularity</h4>
-
-    <div class="landau-controls">
-      <div class="chart-toggle">
-        <button class:active={landauMode === 'nonneg'} on:click={() => landauMode = 'nonneg'}>
-          Non-negative (d(n), like ζ²)
-        </button>
-        <button class:active={landauMode === 'alternating'} on:click={() => landauMode = 'alternating'}>
-          Alternating ((−1)ⁿ⁺¹)
-        </button>
-      </div>
-      <Slider label="Max terms" bind:value={landauN} min={20} max={500} step={10} format={v => v} />
-    </div>
-
-    <svg viewBox="0 0 {lPlotW} {lPlotH}" preserveAspectRatio="xMidYMid meet" class="landau-plot">
-      <defs>
-        <clipPath id="l-clip"><rect x={lM.left} y={lM.top} width={lPW} height={lPH} /></clipPath>
-      </defs>
-
-      <!-- s=1 singularity marker -->
-      <line x1={lXScale(1)} y1={lM.top} x2={lXScale(1)} y2={lM.top + lPH}
-        stroke="var(--color-prime)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5" />
-      <text x={lXScale(1)} y={lM.top - 4} text-anchor="middle" font-size="8"
-        font-family="var(--font-mono)" fill="var(--color-prime)" font-weight="600">
-        singularity
-      </text>
-
-      <!-- y=0 line -->
-      {#if lYMin < 0}
-        <line x1={lM.left} y1={lYScale(0)} x2={lPlotW - lM.right} y2={lYScale(0)}
-          stroke="var(--color-border)" stroke-width="0.5" />
-      {/if}
-
-      <!-- Axes -->
-      <line x1={lM.left} y1={lM.top} x2={lM.left} y2={lM.top + lPH} stroke="var(--color-border)" stroke-width="1" />
-      <line x1={lM.left} y1={lM.top + lPH} x2={lPlotW - lM.right} y2={lM.top + lPH} stroke="var(--color-border)" stroke-width="1" />
-      <text x={lPlotW / 2} y={lPlotH - 4} text-anchor="middle" font-size="10" fill="var(--color-text-muted)">s</text>
-
-      <!-- Convergence zone labels -->
-      <text x={lXScale(2)} y={lM.top + 14} text-anchor="middle" font-size="8"
-        fill="#22c55e" font-family="var(--font-mono)">converges ✓</text>
-      {#if landauMode === 'nonneg'}
-        <text x={lXScale(0.75)} y={lM.top + 14} text-anchor="middle" font-size="8"
-          fill="#ef4444" font-family="var(--font-mono)">diverges ✗</text>
-      {:else}
-        <text x={lXScale(0.75)} y={lM.top + 14} text-anchor="middle" font-size="8"
-          fill="#22c55e" font-family="var(--font-mono)">still converges!</text>
-      {/if}
-
-      <!-- Curves for different N values (lighter = fewer terms) -->
-      <g clip-path="url(#l-clip)">
-        {#each landauCurves as curve, ci}
-          {#each lPath(curve.pts) as seg}
-            <path d={seg} fill="none"
-              stroke={landauMode === 'nonneg' ? 'var(--color-accent)' : '#14b8a6'}
-              stroke-width={ci === landauCurves.length - 1 ? 2.5 : 1.5}
-              opacity={lAlphas[ci]} />
-          {/each}
-        {/each}
-      </g>
-    </svg>
-
-    <div class="landau-readout">
-      {#if landauMode === 'nonneg'}
-        <p><strong>Non-negative coefficients:</strong> The partial sums march upward monotonically.
-        At <Tex tex="s = 1" /> (the singularity), they explode — and there's <em>no way</em> to extend
-        past it. The series is trapped behind the wall.</p>
-      {:else}
-        <p><strong>Alternating signs:</strong> The partial sums oscillate and can settle down
-        <em>even at s = 1 and below</em>, where ζ(s) has a pole. The cancellation between
-        positive and negative terms lets the series "reach past" the singularity.</p>
-      {/if}
-    </div>
-  </div>
-
-  <p>With no singularity anywhere, our non-negative series would be forced to converge for
-  <em>all</em> <Tex tex="s > 0" />. But look at what's hiding inside it:</p>
-
-  <h4>The explosion at s = ½</h4>
-
-  <p>The series contains terms <Tex tex={String.raw`1/m^{2s}`} /> for every coprime <Tex tex="m" />
-  (from the squared Euler factors where <Tex tex={String.raw`\chi(p) = 1`} />).
-  At <Tex tex="s = 1/2" />, this becomes <Tex tex={String.raw`\sum 1/m`} /> — the harmonic series,
-  which we already know diverges! Drag <Tex tex="s" /> toward ½ to see it blow up:</p>
+  <p>Drag <Tex tex="s" /> toward ½ to watch the lower bound explode:</p>
 
   {#if realCharIdx >= 0}
     <div class="viz-container">
-      <h4>The lower bound Σ 1/m²ˢ explodes at s = ½</h4>
+      <h4>Σ 1/m²ˢ explodes at s = ½</h4>
       <Slider label="s" bind:value={realS} min={0.52} max={3} step={0.01} format={v => v.toFixed(2)} />
 
-      <div class="real-plots">
-        <!-- Left: Reality (pole at s=1) -->
-        <div class="real-plot-panel">
-          <div class="real-plot-label">Reality: pole at s=1</div>
-          <svg viewBox="0 0 {rW} {rH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
-            <defs><clipPath id="r-clip-l"><rect x={rM.left} y={rM.top} width={rPW} height={rPH} /></clipPath></defs>
-            <line x1={rXScale(1)} y1={rM.top} x2={rXScale(1)} y2={rM.top + rPH} stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="3,3" opacity="0.5" />
-            <text x={rXScale(1)} y={rH - rM.bottom + 14} text-anchor="middle" font-size="7" font-family="var(--font-mono)" fill="var(--color-prime)">s=1 (pole)</text>
-            <line x1={rM.left} y1={rM.top + rPH} x2={rW - rM.right} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
-            <line x1={rM.left} y1={rM.top} x2={rM.left} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
-            <g clip-path="url(#r-clip-l)">
-              {#each realityPaths as path}
-                <path d={path} fill="none" stroke="var(--color-accent)" stroke-width="2" />
-              {/each}
-            </g>
-            <text x={rW / 2} y={rM.top + 14} text-anchor="middle" font-size="8" fill="var(--color-text-muted)">
-              ζ(s)·L(s,χ) — converges for s {'>'} 1
-            </text>
-          </svg>
-        </div>
+      <svg viewBox="0 0 {lPlotW} {lPlotH}" preserveAspectRatio="xMidYMid meet" class="landau-plot">
+        <defs>
+          <clipPath id="lb-clip"><rect x={lM.left} y={lM.top} width={lPW} height={lPH} /></clipPath>
+        </defs>
 
-        <!-- Right: Hypothetical (if L(1,χ)=0, pole cancelled) -->
-        <div class="real-plot-panel">
-          <div class="real-plot-label" style="color: #ef4444">If L(1,χ) = 0: no pole</div>
-          <svg viewBox="0 0 {rW} {rH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
-            <defs><clipPath id="r-clip-r"><rect x={rM.left} y={rM.top} width={rPW} height={rPH} /></clipPath></defs>
-            <!-- s=1/2 danger zone -->
-            <rect x={rM.left} y={rM.top} width={rXScale(0.5) - rM.left} height={rPH} fill="#ef4444" opacity="0.04" />
-            <line x1={rXScale(0.5)} y1={rM.top} x2={rXScale(0.5)} y2={rM.top + rPH} stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.7" />
-            <text x={rXScale(0.5)} y={rH - rM.bottom + 14} text-anchor="middle" font-size="7" font-family="var(--font-mono)" fill="#ef4444" font-weight="600">s=½ → ∞!</text>
-            <line x1={rXScale(1)} y1={rM.top} x2={rXScale(1)} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.3" />
-            <line x1={rM.left} y1={rM.top + rPH} x2={rW - rM.right} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
-            <line x1={rM.left} y1={rM.top} x2={rM.left} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
-            <g clip-path="url(#r-clip-r)">
-              {#each lowerBoundPaths as path}
-                <path d={path} fill="none" stroke="#ef4444" stroke-width="2" />
-              {/each}
-            </g>
-            <!-- Current s marker -->
-            <line x1={rXScale(realS)} y1={rM.top} x2={rXScale(realS)} y2={rM.top + rPH} stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
-            {#if currentLB < rYMax}
-              <circle cx={rXScale(realS)} cy={rYScale(currentLB)} r="4" fill="#ef4444" stroke="white" stroke-width="1.5" />
-            {/if}
-            <text x={rW / 2} y={rM.top + 14} text-anchor="middle" font-size="8" fill="#ef4444">
-              "should converge" but Σ1/m²ˢ → ∞
-            </text>
-          </svg>
-        </div>
-      </div>
+        <!-- s=1 marker -->
+        <line x1={lXScale(1)} y1={lM.top} x2={lXScale(1)} y2={lM.top + lPH}
+          stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3,3" opacity="0.3" />
+        <text x={lXScale(1)} y={lM.top + lPH + 12} text-anchor="middle" font-size="7"
+          font-family="var(--font-mono)" fill="var(--color-text-light)">s=1 (wall removed)</text>
 
-      <div class="contradiction-readout">
-        <span class="c-item" style="color: #ef4444">
-          Σ 1/m²ˢ at s={realS.toFixed(2)}: <strong>{currentLB > 10000 ? '∞' : currentLB.toFixed(1)}</strong>
+        <!-- s=1/2 danger marker -->
+        <line x1={lXScale(0.5)} y1={lM.top} x2={lXScale(0.5)} y2={lM.top + lPH}
+          stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
+        <text x={lXScale(0.5)} y={lM.top - 4} text-anchor="middle" font-size="8"
+          font-family="var(--font-mono)" fill="#ef4444" font-weight="600">s = ½ → ∞!</text>
+
+        <!-- Axes -->
+        <line x1={lM.left} y1={lM.top + lPH} x2={lPlotW - lM.right} y2={lM.top + lPH}
+          stroke="var(--color-border)" stroke-width="1" />
+        <line x1={lM.left} y1={lM.top} x2={lM.left} y2={lM.top + lPH}
+          stroke="var(--color-border)" stroke-width="1" />
+        <text x={lPlotW / 2} y={lPlotH - 4} text-anchor="middle" font-size="10" fill="var(--color-text-muted)">s</text>
+
+        <!-- The lower bound curve -->
+        <g clip-path="url(#lb-clip)">
+          {#each lowerBoundPaths as path}
+            <path d={path} fill="none" stroke="#ef4444" stroke-width="2.5" />
+          {/each}
+        </g>
+
+        <!-- Current s marker + dot -->
+        <line x1={lXScale(realS)} y1={lM.top} x2={lXScale(realS)} y2={lM.top + lPH}
+          stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
+        {#if currentLB < rYMax}
+          <circle cx={lXScale(realS)} cy={rYScale(currentLB)} r="5" fill="#ef4444" stroke="white" stroke-width="2" />
+        {/if}
+      </svg>
+
+      <p class="contradiction-readout" style="text-align: center">
+        <span style="color: #ef4444; font-family: var(--font-mono); font-size: 0.9rem">
+          Σ 1/m²ˢ at s = {realS.toFixed(2)}: <strong>{currentLB > 10000 ? '∞' : currentLB.toFixed(1)}</strong>
           {#if realS < 0.65}
-            <span class="c-tag violation">diverging → contradiction!</span>
+            — <strong>diverging!</strong>
           {/if}
         </span>
-      </div>
+      </p>
     </div>
   {/if}
 
@@ -1417,24 +1319,18 @@
     margin: -0.1em 0;
   }
 
-  .landau-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1em;
-    align-items: center;
-    margin-bottom: 0.5em;
-  }
-
   .landau-plot { width: 100%; height: auto; }
 
-  .landau-readout {
-    font-size: 0.85rem;
-    color: var(--color-text-muted);
-    text-align: center;
-    margin-top: 0.3em;
+  .trap-steps {
+    margin: 0.5em 0 1em 1.2em;
+    font-size: 0.95rem;
+    line-height: 1.6;
   }
 
-  .landau-readout p { margin: 0; }
+  .trap-steps li {
+    margin-bottom: 0.6em;
+    padding-left: 0.3em;
+  }
 
   .real-plots {
     display: flex;
