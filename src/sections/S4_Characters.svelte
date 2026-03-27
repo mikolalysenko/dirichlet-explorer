@@ -100,23 +100,37 @@
   are invisible to the character system. At coprime numbers, the phasors rotate by specific
   angles determined by the character. This periodic rotation is the key to the filtering trick below.</p>
 
-  <h3>The magic of orthogonality</h3>
+  <h3>The character filter — picking out one column</h3>
 
-  <p>Here's where the radio analogy really works. Characters have a <em>cancellation property</em>:
-  if you take all the characters, evaluate them at some number <Tex tex="m" />,
-  apply the right "tuning weights," and add them up, something amazing happens:</p>
+  <p>Here's the whole point: we want to <strong>detect primes in one specific column</strong>.
+  Characters give us a way to build a filter that passes exactly one residue class
+  and blocks everything else — like noise-cancelling headphones for arithmetic.</p>
 
-  <ul>
-    <li>If <Tex tex="m" /> equals your target residue <Tex tex="a" />, all the arrows line up and you get <strong>1</strong>.</li>
-    <li>If <Tex tex="m" /> is anything else, the arrows point in different directions and <strong>cancel to 0</strong>.</li>
-  </ul>
+  <p>The trick: for each number <Tex tex="m" />, compute a weighted combination of all characters.
+  Use the <em>conjugate</em> (flipped arrow) of the target character value as the weight.
+  Pick two characters below and watch how the inner product builds up term by term:</p>
+
+  <div class="viz-container">
+    <h4>The inner product — step by step</h4>
+    <OrthogonalityAnimated {q} />
+  </div>
+
+  <p>When the characters are the <strong>same</strong>, the product at each residue is always a
+  positive real number (the arrow points right), so the terms pile up to 1.
+  When they're <strong>different</strong>, the products point in different directions and spiral
+  back to zero — perfect cancellation. This is <strong>orthogonality</strong>.</p>
+
+  <h3>The extraction formula</h3>
+
+  <p>Orthogonality gives us an exact filter. For any target residue <Tex tex="a" />, the weighted sum:</p>
 
   <Tex display tex={String.raw`\frac{1}{\varphi(q)} \sum_\chi \overline{\chi(a)} \, \chi(m) = \begin{cases} 1 & \text{if } m \equiv a \pmod{q} \\ 0 & \text{otherwise} \end{cases}`} />
 
-  <p>This is the <strong>extraction formula</strong> — Dirichlet's radio tuner! Watch it in action:</p>
+  <p>This is Dirichlet's radio tuner — it outputs 1 for numbers in the target column and 0 for
+  everything else. Watch it work for every residue simultaneously:</p>
 
   <div class="viz-container">
-    <h4>Orthogonality — the character filter</h4>
+    <h4>The character filter in action</h4>
     <Slider label="Modulus (q)" bind:value={q} min={3} max={7} />
 
     <div class="target-picker">
@@ -133,24 +147,11 @@
       </div>
     </div>
 
-    <p class="ortho-note">For each residue <Tex tex="m" />, we sum the weighted character values.
-    The colored arrows are the individual character contributions. The dot at the end shows the total.
-    Only the target residue <Tex tex="a = {targetResidue}" /> gets a nonzero result!</p>
+    <p class="ortho-note">For each residue <Tex tex="m" />, the colored arrows show each character's
+    weighted contribution. They cancel to 0 everywhere except at the target
+    <Tex tex="a = {targetResidue}" />, where they all line up and sum to 1.</p>
 
     <OrthogonalityViz {q} {targetResidue} />
-  </div>
-
-  <h3>The inner product — step by step</h3>
-
-  <p>To really see orthogonality in action, pick any two characters and watch their
-  <strong>inner product</strong> build up term by term. For each coprime residue <Tex tex="r" />,
-  we multiply one character's value by the conjugate of the other, then accumulate.
-  If the characters are the same, the arrows all point right and sum to 1.
-  If they're different, the arrows spiral around and cancel to 0.</p>
-
-  <div class="viz-container">
-    <h4>Animated inner product</h4>
-    <OrthogonalityAnimated {q} />
   </div>
 
   <Callout type="insight">
