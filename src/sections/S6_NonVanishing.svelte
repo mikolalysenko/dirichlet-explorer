@@ -310,10 +310,12 @@
 
   <h3>The contradiction for complex characters</h3>
 
-  <p>Quick vocabulary: a <strong>pole</strong> is a point where a function blows up to infinity
-  (like <Tex tex={String.raw`\frac{1}{s-1}`} /> at <Tex tex="s = 1" />). A <strong>zero</strong> is where
-  it hits 0 (like <Tex tex="(s-1)" /> at <Tex tex="s = 1" />). When you multiply functions together,
-  poles and zeros can cancel: a pole times a zero gives something finite.</p>
+  <Callout>
+    <p><strong>Vocabulary — poles and zeros:</strong> A <strong>pole</strong> is a point where a function
+    blows up to infinity (like <Tex tex={String.raw`\frac{1}{s-1}`} /> at <Tex tex="s = 1" />).
+    A <strong>zero</strong> is where it hits 0 (like <Tex tex="(s-1)" /> at <Tex tex="s = 1" />).
+    When you multiply functions, poles and zeros can cancel: a pole times a zero gives something finite.</p>
+  </Callout>
 
   <p>We know the product <Tex tex={String.raw`\prod_\chi L(s,\chi)`} /> has exactly <strong>one pole</strong>
   at <Tex tex="s = 1" />, coming from the principal character <Tex tex="\chi_0" />.
