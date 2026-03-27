@@ -8,8 +8,10 @@
   import EulerSieveViz from '../components/viz/EulerSieveViz.svelte';
   import EulerMultiplyViz from '../components/viz/EulerMultiplyViz.svelte';
   import GeometricSeriesViz from '../components/viz/GeometricSeriesViz.svelte';
-  import { zetaPartial } from '../lib/lfunctions.js';
-  import { listPrimes } from '../lib/primes.js';
+  import { zetaPartial, lFunction } from '../lib/lfunctions.js';
+  import { dirichletCharacters } from '../lib/characters.js';
+  import { listPrimes, isPrime } from '../lib/primes.js';
+  import { gcd, coprimeResidues } from '../lib/math-utils.js';
 
   let sValue = 2.0;
   let numTerms = 50;
@@ -18,6 +20,52 @@
   let plotQ = 5;
   let plotS = 2.0;
   let primesOnly = false;
+
+  // Data for the "From L-functions to counting primes" derivation
+  let derivQ = 5;
+  let derivA = 2;
+  let derivS = 1.5;
+
+  $: derivChars = dirichletCharacters(derivQ);
+  $: derivResidues = coprimeResidues(derivQ);
+  $: derivPrimes = listPrimes(30).filter(p => gcd(p, derivQ) === 1);
+
+  // Step 1: log L(s,chi) ≈ sum_p chi(p)/p^s for each character
+  $: step1Data = derivChars.map((chi, idx) => {
+    const terms = derivPrimes.slice(0, 8).map(p => {
+      const chiP = chi.values.get(p % derivQ) || [0, 0];
+      const weight = Math.pow(p, -derivS);
+      return { p, chiP, weighted: [chiP[0] * weight, chiP[1] * weight] };
+    });
+    const logL = lFunction(derivS, chi, 3000);
+    return { chi, terms, logLRe: Math.log(Math.max(0.001, Math.sqrt(logL[0]*logL[0] + logL[1]*logL[1]))), logL, idx };
+  });
+
+  // Step 2: weighted combination chi_bar(a) * log L(s, chi)
+  $: step2Data = derivChars.map((chi, idx) => {
+    const chiA = chi.values.get(derivA % derivQ) || [0, 0];
+    const conjA = [chiA[0], -chiA[1]];
+    const logL = lFunction(derivS, chi, 3000);
+    const logLabs = Math.sqrt(logL[0]*logL[0] + logL[1]*logL[1]);
+    const logLval = logLabs > 0.001 ? [Math.log(logLabs) * logL[0] / logLabs, Math.log(logLabs) * logL[1] / logLabs] : [0, 0];
+    // Actually use Re(log L) for display since L is real for real s > 1
+    const logLre = Math.log(Math.max(0.001, logL[0]));
+    const weighted = [conjA[0] * logLre / derivResidues.length, conjA[1] * logLre / derivResidues.length];
+    return { chi, chiA, conjA, logLre, weighted, idx };
+  });
+
+  $: step2Sum = step2Data.reduce((s, d) => [s[0] + d.weighted[0], s[1] + d.weighted[1]], [0, 0]);
+
+  // Step 3: for each prime, does the filter pass it?
+  $: step3Data = derivPrimes.slice(0, 12).map(p => {
+    const passesFilter = (p % derivQ) === (derivA % derivQ);
+    const weight = Math.pow(p, -derivS);
+    return { p, passesFilter, weight };
+  });
+
+  $: step3Sum = step3Data.filter(d => d.passesFilter).reduce((s, d) => s + d.weight, 0);
+
+  const dCharColors = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444'];
 
   $: allPrimes = listPrimes(200);
   $: primeSet = new Set(allPrimes);
@@ -321,25 +369,119 @@
   <h3>From L-functions to counting primes</h3>
 
   <p>Now we connect everything. The Euler product lets us take logarithms, and the character
-  filter lets us isolate one residue class. Here's the derivation in three steps:</p>
+  filter lets us isolate one residue class. Let's work through it with a concrete example.</p>
+
+  <div class="deriv-controls viz-container">
+    <Slider label="q" bind:value={derivQ} min={3} max={8} />
+    <div class="deriv-a-picker">
+      <label>Target column a:</label>
+      <div class="deriv-a-buttons">
+        {#each derivResidues as r}
+          <button class:active={derivA === r} on:click={() => derivA = r}>{r}</button>
+        {/each}
+      </div>
+    </div>
+    <Slider label="s" bind:value={derivS} min={1.05} max={3} step={0.05} format={v => v.toFixed(2)} />
+  </div>
 
   <p><strong>Step 1: Take the log of the Euler product.</strong>
-  Since <Tex tex={String.raw`L(s,\chi) = \prod_p \frac{1}{1-\chi(p)/p^s}`} />, taking logs turns the product into a sum:</p>
+  Since <Tex tex={String.raw`L(s,\chi) = \prod_p \frac{1}{1-\chi(p)/p^s}`} />, taking logs turns the product into a sum.
+  For each character, <Tex tex={String.raw`\log L(s,\chi)`} /> is approximately the sum of
+  <Tex tex={String.raw`\chi(p)/p^s`} /> over primes:</p>
 
-  <Tex display tex={String.raw`\log L(s, \chi) = \sum_{p} \sum_{k=1}^{\infty} \frac{\chi(p)^k}{k \, p^{ks}} \approx \sum_{p} \frac{\chi(p)}{p^s}`} />
+  <Tex display tex={String.raw`\log L(s, \chi) \approx \sum_{p} \frac{\chi(p)}{p^s}`} />
 
-  <p>(The <Tex tex="k \ge 2" /> terms are small and stay bounded — only the <Tex tex="k=1" /> terms matter.)</p>
+  <div class="viz-container">
+    <h4>Step 1: log L decomposes over primes</h4>
+    <p class="step-note">Each row is a character. Each column is a prime. The cell shows <Tex tex={String.raw`\chi(p)/p^s`} /> — the character's arrow scaled by the prime's weight.</p>
+    <div class="step-table-scroll">
+      <table class="step-table">
+        <thead>
+          <tr>
+            <th></th>
+            {#each derivPrimes.slice(0, 8) as p}
+              <th>p={p}</th>
+            {/each}
+            <th class="sum-col">≈ log L</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each step1Data as row}
+            <tr>
+              <td class="chi-label" style="color: {dCharColors[row.idx % dCharColors.length]}">{row.chi.label}</td>
+              {#each row.terms as t}
+                <td class="term-cell">
+                  <span class="term-value" style="opacity: {0.3 + Math.min(0.7, Math.abs(t.weighted[0]) * 3)}">
+                    {t.weighted[0] >= 0 ? '+' : ''}{t.weighted[0].toFixed(2)}
+                  </span>
+                </td>
+              {/each}
+              <td class="sum-cell" style="color: {dCharColors[row.idx % dCharColors.length]}">
+                <strong>{row.logL[0].toFixed(2)}</strong>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+    <p class="step-note">Notice: the principal character <Tex tex="\chi_0" /> has all positive terms (it's basically log ζ).
+    The others have terms pointing in different directions, partially cancelling.</p>
+  </div>
 
   <p><strong>Step 2: Apply the character filter.</strong>
-  Multiply both sides by <Tex tex={String.raw`\overline{\chi(a)} / \varphi(q)`} /> and sum over all characters <Tex tex="\chi" />:</p>
+  Multiply each character's log L by the conjugate weight <Tex tex={String.raw`\overline{\chi(a)}/\varphi(q)`} />,
+  then add them all up:</p>
 
-  <Tex display tex={String.raw`\frac{1}{\varphi(q)} \sum_{\chi} \overline{\chi(a)} \log L(s,\chi) \approx \frac{1}{\varphi(q)} \sum_{\chi} \overline{\chi(a)} \sum_{p} \frac{\chi(p)}{p^s}`} />
+  <div class="viz-container">
+    <h4>Step 2: weight each log L by <Tex tex={String.raw`\overline{\chi(${derivA})}`} /> and sum</h4>
+    <div class="step2-rows">
+      {#each step2Data as d}
+        <div class="step2-row">
+          <span class="step2-chi" style="color: {dCharColors[d.idx % dCharColors.length]}">{d.chi.label}</span>
+          <span class="step2-arrow">:</span>
+          <span class="step2-val">
+            <Tex tex={String.raw`\overline{\chi(${derivA})}`} /> = {d.conjA[0].toFixed(2)}{d.conjA[1] !== 0 ? (d.conjA[1] > 0 ? '+' : '') + d.conjA[1].toFixed(2) + 'i' : ''}
+          </span>
+          <span class="step2-times">×</span>
+          <span class="step2-val">log L = {d.logLre.toFixed(2)}</span>
+          <span class="step2-times">/ {derivResidues.length} =</span>
+          <span class="step2-result" style="color: {dCharColors[d.idx % dCharColors.length]}">
+            <strong>{d.weighted[0].toFixed(3)}</strong>
+          </span>
+        </div>
+      {/each}
+      <div class="step2-total">
+        Sum = <strong>{step2Sum[0].toFixed(4)}</strong>
+      </div>
+    </div>
+  </div>
 
-  <p><strong>Step 3: Swap the sums and use orthogonality.</strong>
-  On the right side, for each prime <Tex tex="p" />, the inner sum
-  <Tex tex={String.raw`\sum_{\chi} \overline{\chi(a)}\chi(p) / \varphi(q)`} /> is exactly the
-  extraction formula from the characters section — it equals 1 when
-  <Tex tex={String.raw`p \equiv a \pmod{q}`} /> and 0 otherwise. So:</p>
+  <p><strong>Step 3: The filter picks out one column.</strong>
+  On the right side of the equation, for each prime, the extraction formula fires:
+  it equals 1 when <Tex tex={String.raw`p \equiv ${derivA} \pmod{${derivQ}}`} /> and 0 otherwise.
+  Only primes in column {derivA} survive:</p>
+
+  <div class="viz-container">
+    <h4>Step 3: the filter in action on primes</h4>
+    <div class="step3-primes">
+      {#each step3Data as d}
+        <div class="step3-prime" class:passes={d.passesFilter} class:blocked={!d.passesFilter}>
+          <span class="step3-p">{d.p}</span>
+          <span class="step3-mod">{d.p} mod {derivQ} = {d.p % derivQ}</span>
+          {#if d.passesFilter}
+            <span class="step3-contrib">1/{d.p}<sup>{derivS.toFixed(1)}</sup> = {d.weight.toFixed(4)}</span>
+          {:else}
+            <span class="step3-blocked">✗ filtered out</span>
+          {/if}
+        </div>
+      {/each}
+    </div>
+    <p class="step3-result">
+      <Tex tex={String.raw`\sum_{\substack{p \equiv ${derivA} \pmod{${derivQ}}}} \frac{1}{p^{${derivS.toFixed(1)}}}`} />
+      ≈ <strong>{step3Sum.toFixed(4)}</strong>
+      — matches the weighted combination above!
+    </p>
+  </div>
 
   <Tex display tex={String.raw`\frac{1}{\varphi(q)} \sum_{\chi} \overline{\chi(a)} \log L(s,\chi) \approx \sum_{\substack{p \equiv a \pmod{q}}} \frac{1}{p^s}`} />
 
@@ -413,5 +555,136 @@
   .explosion {
     color: var(--color-prime);
     font-weight: 600;
+  }
+
+  /* Derivation section styles */
+  .deriv-controls { margin-bottom: 1em; }
+
+  .deriv-a-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0.3em 0;
+  }
+
+  .deriv-a-picker label {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+  }
+
+  .deriv-a-buttons { display: flex; gap: 0.25em; }
+
+  .deriv-a-buttons button {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    width: 30px;
+    height: 30px;
+    border: 1.5px solid var(--color-border);
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .deriv-a-buttons button:hover { border-color: var(--color-accent); }
+  .deriv-a-buttons button.active { background: var(--color-prime); border-color: var(--color-prime); color: white; font-weight: 600; }
+
+  .step-note { font-size: 0.8rem; color: var(--color-text-muted); margin: 0.3em 0; }
+
+  .step-table-scroll { overflow-x: auto; }
+
+  .step-table {
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    margin: 0 auto;
+  }
+
+  .step-table th, .step-table td {
+    padding: 0.2em 0.4em;
+    text-align: center;
+    border: 1px solid var(--color-border-light);
+    min-width: 48px;
+  }
+
+  .step-table th { background: var(--color-bg-alt); font-size: 0.68rem; color: var(--color-text-muted); }
+  .step-table .chi-label { font-weight: 700; font-size: 0.75rem; background: var(--color-bg-alt); }
+  .step-table .term-cell { font-size: 0.7rem; }
+  .step-table .term-value { font-weight: 500; }
+  .step-table .sum-col { border-left: 2px solid var(--color-border); }
+  .step-table .sum-cell { border-left: 2px solid var(--color-border); font-size: 0.8rem; }
+
+  .step2-rows { font-family: var(--font-mono); font-size: 0.78rem; }
+
+  .step2-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.2em 0;
+    flex-wrap: wrap;
+  }
+
+  .step2-chi { font-weight: 700; min-width: 24px; }
+  .step2-arrow { color: var(--color-text-light); }
+  .step2-val { color: var(--color-text-muted); font-size: 0.72rem; }
+  .step2-times { color: var(--color-text-light); font-size: 0.72rem; }
+  .step2-result { font-size: 0.82rem; }
+
+  .step2-total {
+    margin-top: 0.3em;
+    padding-top: 0.3em;
+    border-top: 1.5px solid var(--color-border);
+    font-weight: 700;
+    color: var(--color-accent);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+
+  .step3-primes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    margin: 0.5em 0;
+  }
+
+  .step3-prime {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.3em 0.5em;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    min-width: 60px;
+    transition: all 0.2s ease;
+  }
+
+  .step3-prime.passes {
+    background: var(--color-prime-bg);
+    border: 1.5px solid var(--color-prime);
+  }
+
+  .step3-prime.blocked {
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border-light);
+    opacity: 0.5;
+  }
+
+  .step3-p { font-weight: 700; font-size: 0.85rem; }
+  .step3-prime.passes .step3-p { color: var(--color-prime); }
+  .step3-mod { font-size: 0.6rem; color: var(--color-text-light); }
+  .step3-contrib { font-size: 0.68rem; color: var(--color-prime); font-weight: 500; }
+  .step3-blocked { font-size: 0.65rem; color: var(--color-text-light); }
+
+  .step3-result {
+    font-size: 0.9rem;
+    text-align: center;
+    margin-top: 0.3em;
+  }
+
+  .step3-result strong {
+    font-family: var(--font-mono);
+    color: var(--color-prime);
   }
 </style>
