@@ -8,15 +8,41 @@
 
   let q = 12;
   let inputN = 25;
-  let opA = 5;
-  let opB = 7;
-  let operation = 'multiply';
 
   $: residues = coprimeResidues(q);
   $: phi = totient(q);
-  $: opResult = operation === 'multiply'
-    ? (opA * opB) % q
-    : (opA + opB) % q;
+
+  // Multiplication table
+  let showOnlyCoprime = false;
+  let hoverCell = null; // { a, b }
+
+  $: tableEntries = (() => {
+    const entries = showOnlyCoprime ? residues : Array.from({ length: q - 1 }, (_, i) => i + 1);
+    return entries;
+  })();
+
+  $: mulResult = hoverCell ? (hoverCell.a * hoverCell.b) % q : null;
+
+  function cellColor(a, b) {
+    const product = (a * b) % q;
+    const aCop = gcd(a, q) === 1;
+    const bCop = gcd(b, q) === 1;
+    const pCop = gcd(product, q) === 1;
+
+    if (hoverCell && hoverCell.a === a && hoverCell.b === b) return 'var(--color-accent)';
+    if (!aCop || !bCop) return 'var(--color-bg-alt)';
+    if (product === 1) return 'var(--color-prime-bg)'; // identity — highlight inverses
+    if (pCop) return 'var(--color-accent-light)';
+    return 'white';
+  }
+
+  function textColor(a, b) {
+    if (hoverCell && hoverCell.a === a && hoverCell.b === b) return 'white';
+    const product = (a * b) % q;
+    if (product === 1) return 'var(--color-prime)';
+    if (gcd(a, q) !== 1 || gcd(b, q) !== 1) return 'var(--color-text-light)';
+    return 'var(--color-text)';
+  }
 </script>
 
 <Section id="modular" title="Remainder Clocks" subtitle="Numbers that wrap around — the language of patterns.">
@@ -46,45 +72,82 @@
     </div>
   </div>
 
-  <h3>Clock arithmetic</h3>
+  <h3>The multiplication table</h3>
 
-  <p>You can add and multiply on the clock — just do the operation and take the remainder.
-  Something magical happens with the coprime positions: when you multiply two coprime positions,
-  you <em>always</em> land on another coprime position!</p>
+  <p>When you multiply two coprime positions on the clock, you <em>always</em> land on another coprime position.
+  The table below shows every product mod {q}. Toggle to show only the coprime entries — that's
+  the <strong>group</strong> hiding inside.</p>
 
-  <p><strong>Why?</strong> Suppose <Tex tex="a" /> and <Tex tex="b" /> both share no factor with <Tex tex="q" />.
-  Could their product <Tex tex="a \cdot b" /> share a factor with <Tex tex="q" />?
+  <p><strong>Why closure works:</strong> Suppose <Tex tex="a" /> and <Tex tex="b" /> both share no factor with <Tex tex="q" />.
   If some prime <Tex tex="p" /> divided both <Tex tex="a \cdot b" /> and <Tex tex="q" />,
   then <Tex tex="p" /> would have to divide <Tex tex="a" /> or <Tex tex="b" />
-  (that's what primes do — they can't divide a product without dividing at least one factor).
-  But that contradicts <Tex tex="a" /> and <Tex tex="b" /> being coprime to <Tex tex="q" />.
-  So <Tex tex="a \cdot b" /> must be coprime to <Tex tex="q" /> too.</p>
+  (primes can't divide a product without dividing at least one factor).
+  That contradicts coprimality. So <Tex tex="a \cdot b" /> stays coprime to <Tex tex="q" />.</p>
 
   <div class="viz-container">
-    <h4>Multiply on the clock</h4>
+    <h4>Multiplication table mod {q}</h4>
 
-    <div class="op-controls">
-      <div class="op-row">
-        <input type="number" bind:value={opA} min={1} max={q - 1} class="number-input" />
-        <select bind:value={operation} class="op-select">
-          <option value="multiply">×</option>
-          <option value="add">+</option>
-        </select>
-        <input type="number" bind:value={opB} min={1} max={q - 1} class="number-input" />
-        <span class="op-equals">≡</span>
-        <span class="op-result number">{opResult}</span>
-        <span class="op-mod">(mod {q})</span>
-      </div>
-      <div class="coprime-check">
-        {#if gcd(opA, q) === 1 && gcd(opB, q) === 1}
-          <span class="check-yes">Both inputs are coprime to {q}, and the result ({opResult}) is {gcd(opResult, q) === 1 ? 'also coprime!' : 'too.'}</span>
-        {:else}
-          <span class="check-no">At least one input shares a factor with {q}.</span>
-        {/if}
-      </div>
+    <div class="table-toggle">
+      <button class:active={!showOnlyCoprime} on:click={() => showOnlyCoprime = false}>All entries</button>
+      <button class:active={showOnlyCoprime} on:click={() => showOnlyCoprime = true}>Coprime only (the group)</button>
     </div>
 
-    <ModClock {q} highlightN={opA} operationResult={opResult} showCoprime={true} />
+    <div class="mul-table-scroll">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <table class="mul-table" on:mouseleave={() => hoverCell = null}>
+        <thead>
+          <tr>
+            <th class="corner">×</th>
+            {#each tableEntries as b}
+              <th class:coprime-header={gcd(b, q) === 1} class:hover-col={hoverCell && hoverCell.b === b}>{b}</th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody>
+          {#each tableEntries as a}
+            <tr>
+              <th class:coprime-header={gcd(a, q) === 1} class:hover-row={hoverCell && hoverCell.a === a}>{a}</th>
+              {#each tableEntries as b}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <td
+                  style="background: {cellColor(a, b)}; color: {textColor(a, b)}"
+                  on:mouseenter={() => hoverCell = { a, b }}
+                >
+                  {(a * b) % q}
+                </td>
+              {/each}
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+
+    {#if hoverCell}
+      <p class="table-readout">
+        <span class="number">{hoverCell.a}</span> × <span class="number">{hoverCell.b}</span>
+        ≡ <strong class="number">{mulResult}</strong> (mod {q})
+        {#if mulResult === 1}
+          — <span class="inverse-note">inverse pair!</span>
+        {/if}
+        {#if gcd(hoverCell.a, q) === 1 && gcd(hoverCell.b, q) === 1}
+          {#if gcd(mulResult, q) === 1}
+            <span class="closure-note">coprime × coprime = coprime ✓</span>
+          {/if}
+        {/if}
+      </p>
+    {:else}
+      <p class="table-readout muted">Hover over the table to see products</p>
+    {/if}
+
+    {#if showOnlyCoprime}
+      <p class="group-note">
+        This {phi}×{phi} table is the <strong>multiplication table of the group</strong>
+        <Tex tex={String.raw`(\mathbb{Z}/${q}\mathbb{Z})^{\times}`} />.
+        Notice: every row and column contains each coprime residue exactly once
+        (it's a <em>Latin square</em>). The <span class="inverse-note">gold cells</span> show
+        inverse pairs where the product is 1.
+      </p>
+    {/if}
   </div>
 
   <Callout type="insight">
@@ -116,16 +179,6 @@
     font-size: 1.1rem;
   }
 
-  .number-input {
-    font-family: var(--font-mono);
-    font-size: 0.9rem;
-    width: 60px;
-    padding: 0.3em 0.5em;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    text-align: center;
-  }
-
   .coprime-info {
     margin-top: 1em;
     padding: 0.8em;
@@ -138,54 +191,114 @@
     margin-bottom: 0.3em;
   }
 
-  .op-controls {
-    margin-bottom: 1em;
+  .table-toggle {
+    display: flex;
+    gap: 0.4em;
+    margin-bottom: 0.8em;
   }
 
-  .op-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
-    flex-wrap: wrap;
+  .table-toggle button {
+    font-family: var(--font-serif);
+    font-size: 0.8rem;
+    padding: 0.35em 0.9em;
+    border: 1.5px solid var(--color-border);
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: var(--color-text-muted);
+  }
+
+  .table-toggle button:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .table-toggle button.active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+    font-weight: 600;
+  }
+
+  .mul-table-scroll {
+    overflow-x: auto;
     margin-bottom: 0.5em;
   }
 
-  .op-select {
+  .mul-table {
+    border-collapse: collapse;
     font-family: var(--font-mono);
-    font-size: 1rem;
-    padding: 0.3em;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: white;
+    font-size: 0.8rem;
+    margin: 0 auto;
+    user-select: none;
   }
 
-  .op-equals {
-    font-family: var(--font-mono);
-    font-size: 1.1rem;
+  .mul-table th, .mul-table td {
+    width: 32px;
+    height: 28px;
+    text-align: center;
+    border: 1px solid var(--color-border-light);
+    padding: 0;
+    transition: background 0.1s ease;
+  }
+
+  .mul-table th {
+    background: var(--color-bg-alt);
+    font-weight: 600;
     color: var(--color-text-muted);
+    font-size: 0.75rem;
   }
 
-  .op-result {
-    font-weight: 700;
-    font-size: 1.1rem;
+  .mul-table th.coprime-header {
     color: var(--color-accent);
   }
 
-  .op-mod {
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
+  .mul-table th.hover-row,
+  .mul-table th.hover-col {
+    background: var(--color-accent-light);
+    color: var(--color-accent);
+  }
+
+  .mul-table .corner {
     color: var(--color-text-light);
+    font-size: 0.9rem;
   }
 
-  .coprime-check {
+  .mul-table td {
+    cursor: default;
+    font-weight: 500;
+  }
+
+  .table-readout {
+    text-align: center;
+    font-family: var(--font-mono);
     font-size: 0.85rem;
+    margin: 0.3em 0;
+    min-height: 1.3em;
   }
 
-  .check-yes {
+  .table-readout.muted {
+    color: var(--color-text-light);
+    font-style: italic;
+    font-family: var(--font-serif);
+  }
+
+  .inverse-note {
+    color: var(--color-prime);
+    font-weight: 600;
+  }
+
+  .closure-note {
     color: var(--color-accent);
+    font-size: 0.78rem;
+    margin-left: 0.3em;
   }
 
-  .check-no {
+  .group-note {
+    font-size: 0.85rem;
     color: var(--color-text-muted);
+    text-align: center;
+    margin-top: 0.3em;
   }
 </style>
