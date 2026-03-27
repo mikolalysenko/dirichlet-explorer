@@ -3,14 +3,14 @@
   import Tex from '../components/Tex.svelte';
   import Callout from '../components/ui/Callout.svelte';
   import Slider from '../components/ui/Slider.svelte';
-  import { dirichletCharacters, complexAbs } from '../lib/characters.js';
+  import { dirichletCharacters, complexAbs, complexMul, characterContinuousData } from '../lib/characters.js';
   import { lFunction } from '../lib/lfunctions.js';
-  import { complexMul } from '../lib/characters.js';
 
   let q = 5;
   let sValue = 1.5;
 
   $: characters = dirichletCharacters(q);
+  $: contData = characterContinuousData(q);
 
   const sMin = 1.005;
   const sMaxPlot = 4;
