@@ -15,8 +15,26 @@
   // Use BigInt to avoid overflow for large products
   $: productBig = euclidPrimes.reduce((a, b) => a * BigInt(b), 1n);
   $: plusOneBig = productBig + 1n;
-  $: productStr = productBig.toLocaleString();
-  $: plusOneStr = plusOneBig.toLocaleString();
+
+  // Format big numbers nicely
+  function formatBig(n) {
+    const s = n.toString();
+    if (s.length <= 15) return Number(n).toLocaleString();
+    // Show first 6 digits ... last 6 digits (N digits)
+    return `${s.slice(0, 6)}...${s.slice(-6)} (${s.length} digits)`;
+  }
+
+  $: productStr = formatBig(productBig);
+  $: plusOneStr = formatBig(plusOneBig);
+  $: isHuge = productBig.toString().length > 20;
+  $: isAbsurd = productBig.toString().length > 100;
+
+  // Track shake animation
+  let shaking = false;
+  function triggerShake() {
+    shaking = true;
+    setTimeout(() => shaking = false, 600);
+  }
 
   // Fast factorization for Euclid's construction.
   // Key insight: product+1 is coprime to all primes in our list, so we
@@ -47,16 +65,29 @@
   }
 
   $: plusOneFactors = factorizeSmart(plusOneBig, euclidPrimes);
+
+  function formatFactor(f) {
+    if (typeof f === 'bigint') {
+      const s = f.toString();
+      if (s.length <= 12) return s;
+      return `${s.slice(0, 5)}...${s.slice(-5)}`;
+    }
+    return f.toLocaleString();
+  }
+
   $: newPrime = plusOneFactors.find(f => {
     const num = typeof f === 'bigint' ? Number(f) : f;
     return !euclidPrimes.includes(num);
   });
+
+  $: newPrimeIsBig = newPrime != null && (typeof newPrime === 'bigint' ? newPrime.toString().length > 12 : newPrime > 1e12);
 
   function addPrime() {
     if (newPrime != null) {
       const num = typeof newPrime === 'bigint' ? Number(newPrime) : newPrime;
       if (!euclidPrimes.includes(num)) {
         euclidPrimes = [...euclidPrimes, num].sort((a, b) => a - b);
+        if (productBig.toString().length > 30) triggerShake();
       }
     }
   }
@@ -100,21 +131,35 @@
     not on your list — contradiction! There must always be more primes.</p>
   </Callout>
 
-  <div class="viz-container">
+  <div class="viz-container euclid-box" class:shaking>
     <h4>Euclid's argument in action</h4>
     <p>Your "complete" list of primes: <strong class="prime-number">{euclidPrimes.join(' × ')}</strong></p>
-    <p>Product: <span class="number">{euclidPrimes.join(' × ')} = {productStr}</span></p>
-    <p>Product + 1 = <span class="number">{plusOneStr}</span></p>
+    <p class="big-number-line">Product: <span class="number big-num">{euclidPrimes.join(' × ')} = {productStr}</span></p>
+    <p class="big-number-line">Product + 1 = <span class="number big-num">{plusOneStr}</span></p>
     <p>
-      None of your listed primes divide {plusOneStr} evenly!
+      None of your listed primes divide this evenly!
       {#if plusOneFactors.length > 0}
-        Its prime factors are: <strong class="prime-number">{plusOneFactors.join(', ')}</strong>
+        Its prime factors are: <strong class="prime-number">{plusOneFactors.map(formatFactor).join(', ')}</strong>
+        {#if newPrimeIsBig}
+          <span class="big-prime-note">(that's a big prime!)</span>
+        {/if}
       {/if}
     </p>
     {#if newPrime}
       <button class="add-prime-btn" on:click={addPrime}>
-        Add {newPrime} to the list and try again
+        Add {formatFactor(newPrime)} to the list and try again
       </button>
+    {/if}
+    {#if isAbsurd}
+      <p class="easter-egg">
+        The numbers are now so large that writing them out would fill a book.
+        And yet... there are always more primes. Always.
+      </p>
+    {:else if isHuge}
+      <p class="huge-note">
+        These numbers have {productBig.toString().length} digits — far beyond what any calculator can handle.
+        But Euclid's argument doesn't care how big they get!
+      </p>
     {/if}
   </div>
 
@@ -169,6 +214,57 @@
 
   .add-prime-btn:hover {
     background: #1d4ed8;
+  }
+
+  .big-number-line {
+    overflow-wrap: break-word;
+    word-break: break-all;
+  }
+
+  .big-num {
+    font-size: 0.85em;
+  }
+
+  .big-prime-note {
+    font-size: 0.8rem;
+    color: var(--color-text-light);
+    font-style: italic;
+  }
+
+  .huge-note {
+    font-size: 0.85rem;
+    color: var(--color-accent);
+    font-style: italic;
+    text-align: center;
+    margin-top: 0.5em;
+  }
+
+  .easter-egg {
+    font-size: 0.9rem;
+    color: var(--color-prime);
+    font-weight: 500;
+    text-align: center;
+    margin-top: 0.5em;
+    font-style: italic;
+  }
+
+  .euclid-box {
+    transition: transform 0.1s ease;
+  }
+
+  .euclid-box.shaking {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10% { transform: translateX(-6px) rotate(-1deg); }
+    20% { transform: translateX(5px) rotate(1deg); }
+    30% { transform: translateX(-4px) rotate(-0.5deg); }
+    40% { transform: translateX(4px) rotate(0.5deg); }
+    50% { transform: translateX(-3px); }
+    60% { transform: translateX(2px); }
+    70% { transform: translateX(-1px); }
   }
 
   /* density plot styles are in the PrimeDensityPlot component */
