@@ -100,37 +100,20 @@
   are invisible to the character system. At coprime numbers, the phasors rotate by specific
   angles determined by the character. This periodic rotation is the key to the filtering trick below.</p>
 
-  <h3>The character filter — picking out one column</h3>
-
-  <p>Here's the whole point: we want to <strong>detect primes in one specific column</strong>.
-  Characters give us a way to build a filter that passes exactly one residue class
-  and blocks everything else — like noise-cancelling headphones for arithmetic.</p>
-
-  <p>The trick: for each number <Tex tex="m" />, compute a weighted combination of all characters.
-  Use the <em>conjugate</em> (flipped arrow) of the target character value as the weight.
-  Pick two characters below and watch how the inner product builds up term by term:</p>
-
-  <div class="viz-container">
-    <h4>The inner product — step by step</h4>
-    <OrthogonalityAnimated {q} />
-  </div>
-
-  <p>When the characters are the <strong>same</strong>, the product at each residue is always a
-  positive real number (the arrow points right), so the terms pile up to 1.
-  When they're <strong>different</strong>, the products point in different directions and spiral
-  back to zero — perfect cancellation. This is <strong>orthogonality</strong>.</p>
-
   <h3>The extraction formula</h3>
 
-  <p>Orthogonality gives us an exact filter. For any target residue <Tex tex="a" />, the weighted sum:</p>
+  <p>Characters have a remarkable property. If you take a weighted sum of all characters
+  at some number <Tex tex="m" /> — using the conjugate (flipped arrow) of a target residue
+  <Tex tex="a" /> as weights — something magical happens:</p>
 
   <Tex display tex={String.raw`\frac{1}{\varphi(q)} \sum_\chi \overline{\chi(a)} \, \chi(m) = \begin{cases} 1 & \text{if } m \equiv a \pmod{q} \\ 0 & \text{otherwise} \end{cases}`} />
 
-  <p>This is Dirichlet's radio tuner — it outputs 1 for numbers in the target column and 0 for
-  everything else. Watch it work for every residue simultaneously:</p>
+  <p>This is the <strong>extraction formula</strong> — Dirichlet's radio tuner.
+  It outputs 1 for numbers in the target column and 0 for everything else.
+  Pick a target residue and watch it work for every <Tex tex="m" /> simultaneously:</p>
 
   <div class="viz-container">
-    <h4>The character filter in action</h4>
+    <h4>The extraction formula in action</h4>
     <Slider label="Modulus (q)" bind:value={q} min={3} max={7} />
 
     <div class="target-picker">
@@ -153,6 +136,24 @@
 
     <OrthogonalityViz {q} {targetResidue} />
   </div>
+
+  <h3>Why does it work? Orthogonality</h3>
+
+  <p>The extraction formula works because of <strong>orthogonality</strong>: different characters
+  cancel each other out. To see why, look at the <strong>inner product</strong> of two characters.
+  For each coprime residue <Tex tex="r" />, multiply one character's value by the conjugate
+  of the other, then add them all up:</p>
+
+  <div class="viz-container">
+    <h4>The inner product — step by step</h4>
+    <OrthogonalityAnimated {q} />
+  </div>
+
+  <p>When the characters are the <strong>same</strong>, every product is a positive real number
+  (the arrow points right), so the terms pile up to 1.
+  When they're <strong>different</strong>, the products point in various directions and spiral
+  back to zero — perfect cancellation. This orthogonality is what makes the extraction
+  formula work: the "wrong" characters cancel, leaving only the "right" one.</p>
 
   <Callout type="insight">
     <p><strong>What the filter gives us:</strong> The extraction formula is a perfect sieve —
