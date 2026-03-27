@@ -29,6 +29,9 @@
 
   <p>Here's a powerful way to see them: arrange all numbers in a grid with
   <Tex tex="q" /> columns. Each column contains numbers that share the same <strong>remainder</strong> when divided by <Tex tex="q" />.
+  Mathematicians call each column a <strong>residue class</strong> — it's the set of all numbers
+  with a given remainder. For example, with <Tex tex="q = 6" />, the "remainder 1" class
+  is {'{'}1, 7, 13, 19, 25, ...{'}'} — all numbers that leave remainder 1 when divided by 6.
   The primes are highlighted — notice which columns they appear in!</p>
 
   <div class="viz-container">

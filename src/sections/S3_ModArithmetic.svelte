@@ -52,7 +52,10 @@
   The number 25 on a 12-hour clock? That's position 1 (since 25 = 2×12 + <strong>1</strong>).</p>
 
   <p>This is <strong>modular arithmetic</strong> — the math of remainders. We write
-  <Tex tex="25 \equiv 1 \pmod{12}" /> and say "25 is congruent to 1 mod 12."</p>
+  <Tex tex="25 \equiv 1 \pmod{12}" /> and say "25 is congruent to 1 mod 12."
+  Each position on the clock is a <strong>residue class</strong> — the set of all numbers
+  that land on that position. The "1" class contains 1, 13, 25, 37, ...
+  (all numbers with remainder 1 when divided by 12).</p>
 
   <div class="viz-container">
     <h4>The mod-{q} clock</h4>
