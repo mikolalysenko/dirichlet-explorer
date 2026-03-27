@@ -15,32 +15,57 @@
   let eulerPrimes = 5;
   let plotQ = 5;
   let plotS = 2.0;
+  let primesOnly = false;
 
-  $: harmonicSum = zetaPartial(1, numTerms).toFixed(3);
-  $: primes20 = listPrimes(50);
-  $: primeSumTerms = primes20.slice(0, Math.min(numTerms, primes20.length));
-  $: primeSum = primeSumTerms.reduce((s, p) => s + 1 / p, 0).toFixed(3);
+  $: allPrimes = listPrimes(200);
+  $: primeSet = new Set(allPrimes);
 
-  // Bar chart data for harmonic series
-  $: harmonicBars = Array.from({ length: Math.min(numTerms, 30) }, (_, i) => ({
-    n: i + 1,
-    value: 1 / (i + 1)
-  }));
+  // Harmonic / prime reciprocal bars
+  $: harmonicBars = (() => {
+    const bars = [];
+    for (let n = 1; n <= numTerms; n++) {
+      if (primesOnly && !primeSet.has(n)) continue;
+      bars.push({ n, value: 1 / n, isPrime: primeSet.has(n) });
+    }
+    return bars;
+  })();
+  $: harmonicMax = harmonicBars.length > 0 ? Math.max(...harmonicBars.map(b => b.value)) : 1;
+  $: harmonicSum = harmonicBars.reduce((s, b) => s + b.value, 0);
 
-  // Bar chart for 1/n^s
-  $: sBars = Array.from({ length: 20 }, (_, i) => ({
-    n: i + 1,
-    value: Math.pow(i + 1, -sValue)
-  }));
+  // S-dial bars
+  $: sBars = (() => {
+    const bars = [];
+    for (let n = 1; n <= 30; n++) {
+      if (primesOnly && !primeSet.has(n)) continue;
+      bars.push({ n, value: Math.pow(n, -sValue), isPrime: primeSet.has(n) });
+    }
+    return bars;
+  })();
+  $: sMax = sBars.length > 0 ? Math.max(...sBars.map(b => b.value)) : 1;
 
-  $: sSumRaw = zetaPartial(sValue, 5000);
-  $: sSum = sValue <= 1.0
+  $: sSumRaw = (() => {
+    if (sValue <= 1.0) return Infinity;
+    let sum = 0;
+    for (let n = 1; n <= 5000; n++) {
+      if (primesOnly && !primeSet.has(n) && n > 200) continue;
+      if (primesOnly && !primeSet.has(n)) continue;
+      sum += Math.pow(n, -sValue);
+    }
+    return sum;
+  })();
+  $: sSum = !isFinite(sSumRaw)
     ? '∞'
     : sSumRaw > 1000
       ? sSumRaw.toFixed(0)
       : sSumRaw > 100
         ? sSumRaw.toFixed(1)
         : sSumRaw.toFixed(4);
+
+  // SVG chart dimensions
+  const chartW = 660;
+  const chartH = 160;
+  const chartM = { left: 8, right: 8, top: 4, bottom: 18 };
+  const chartInnerH = chartH - chartM.top - chartM.bottom;
 </script>
 
 <Section id="lfunctions" title="The Prime-Counting Machine" subtitle="L-functions: the tool that connects sums over numbers to products over primes.">
@@ -55,23 +80,49 @@
     <h4>The harmonic series — it never stops growing</h4>
     <Slider label="# of terms" bind:value={numTerms} min={5} max={100} step={5} format={v => v} />
 
-    <div class="bar-chart">
-      {#each harmonicBars as bar}
-        <div class="bar-col">
-          <div class="bar" style="height: {bar.value * 150}px"></div>
-          {#if bar.n <= 10 || bar.n % 5 === 0}
-            <span class="bar-n">{bar.n}</span>
-          {/if}
-        </div>
-      {/each}
+    <div class="chart-toggle">
+      <button class:active={!primesOnly} on:click={() => primesOnly = false}>All numbers (1/n)</button>
+      <button class:active={primesOnly} on:click={() => primesOnly = true}>Primes only (1/p)</button>
     </div>
 
-    <p class="sum-display">Sum of first {numTerms} terms: <strong>{harmonicSum}</strong>
-    <span class="note">(slowly but surely heading to infinity)</span></p>
+    <svg viewBox="0 0 {chartW} {chartH}" preserveAspectRatio="xMidYMid meet" class="bar-svg">
+      {#each harmonicBars as bar, i}
+        {@const barW = Math.max(2, (chartW - chartM.left - chartM.right) / harmonicBars.length - 1.5)}
+        {@const barH = (bar.value / harmonicMax) * chartInnerH}
+        {@const x = chartM.left + i * ((chartW - chartM.left - chartM.right) / harmonicBars.length)}
+        {@const y = chartM.top + chartInnerH - barH}
+        <rect
+          {x} {y} width={barW} height={barH}
+          fill={bar.isPrime ? 'var(--color-prime-bg)' : 'var(--color-accent-light)'}
+          stroke={bar.isPrime ? 'var(--color-prime)' : 'var(--color-accent)'}
+          stroke-width="0.5"
+          rx="1"
+        />
+        {#if harmonicBars.length <= 40 || bar.n % 5 === 0 || bar.n === 1}
+          <text
+            x={x + barW / 2} y={chartH - 3}
+            text-anchor="middle" font-size={harmonicBars.length > 50 ? '5' : '7'}
+            font-family="var(--font-mono)"
+            fill={bar.isPrime ? 'var(--color-prime)' : 'var(--color-text-light)'}
+            font-weight={bar.isPrime ? '600' : '400'}
+          >{bar.n}</text>
+        {/if}
+      {/each}
+    </svg>
+
+    <p class="sum-display">
+      {#if primesOnly}
+        Sum of 1/p for primes up to {numTerms}: <strong>{harmonicSum.toFixed(3)}</strong>
+      {:else}
+        Sum of first {numTerms} terms: <strong>{harmonicSum.toFixed(3)}</strong>
+      {/if}
+      <span class="note">(slowly but surely heading to infinity)</span>
+    </p>
   </div>
 
-  <p>Here's the remarkable fact that Euler discovered: <strong>the sum of <Tex tex="1/p" /> over just
-  the primes also goes to infinity</strong>. It grows much more slowly, but it never stops.
+  <p>Here's a remarkable fact Euler discovered: <strong>the sum of <Tex tex="1/p" /> over just
+  the primes also goes to infinity</strong>. Toggle "Primes only" above to see it —
+  the bars are sparser, the sum grows more slowly, but it never stops.
   This is another way to prove there are infinitely many primes.</p>
 
   <h3>The s-dial: controlling the speed</h3>
@@ -85,17 +136,32 @@
     <h4>The s-dial — turn it to control convergence</h4>
     <Slider label="s" bind:value={sValue} min={0.5} max={4} step={0.01} format={v => v.toFixed(2)} />
 
-    <div class="bar-chart">
-      {#each sBars as bar}
-        <div class="bar-col">
-          <div class="bar s-bar" style="height: {Math.min(bar.value * 150, 160)}px"></div>
-          <span class="bar-n">{bar.n}</span>
-        </div>
+    <svg viewBox="0 0 {chartW} {chartH}" preserveAspectRatio="xMidYMid meet" class="bar-svg">
+      {#each sBars as bar, i}
+        {@const barW = Math.max(2, (chartW - chartM.left - chartM.right) / sBars.length - 1.5)}
+        {@const barH = sMax > 0 ? (bar.value / sMax) * chartInnerH : 0}
+        {@const x = chartM.left + i * ((chartW - chartM.left - chartM.right) / sBars.length)}
+        {@const y = chartM.top + chartInnerH - barH}
+        <rect
+          {x} {y} width={barW} height={barH}
+          fill={bar.isPrime ? 'var(--color-prime-bg)' : 'var(--color-prime-bg)'}
+          stroke="var(--color-prime)"
+          stroke-width="0.5"
+          rx="1"
+        />
+        {#if sBars.length <= 30 || bar.n % 5 === 0}
+          <text
+            x={x + barW / 2} y={chartH - 3}
+            text-anchor="middle" font-size="7"
+            font-family="var(--font-mono)"
+            fill="var(--color-text-light)"
+          >{bar.n}</text>
+        {/if}
       {/each}
-    </div>
+    </svg>
 
     <p class="sum-display">
-      <Tex tex={`\\sum 1/n^{${sValue === Math.round(sValue) ? sValue : sValue.toFixed(2)}}`} /> ≈ <strong>{sSum}</strong>
+      <Tex tex={`\\sum 1/${primesOnly ? 'p' : 'n'}^{${sValue === Math.round(sValue) ? sValue : sValue.toFixed(2)}}`} /> ≈ <strong>{sSum}</strong>
       {#if sValue <= 1.0}
         <span class="note explosion">Diverges! (s ≤ 1)</span>
       {:else if sValue < 1.1}
@@ -264,43 +330,40 @@
 </Section>
 
 <style>
-  .bar-chart {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 170px;
-    margin: 1em 0 0.5em;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--color-border-light);
-    overflow-x: auto;
-  }
-
-  .bar-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 16px;
-    flex: 1;
-  }
-
-  .bar {
-    background: var(--color-accent-light);
-    border: 1px solid var(--color-accent);
-    border-radius: 2px 2px 0 0;
+  .bar-svg {
     width: 100%;
-    transition: height 0.3s ease;
+    height: auto;
+    margin: 0.5em 0;
   }
 
-  .s-bar {
-    background: var(--color-prime-bg);
-    border-color: var(--color-prime);
+  .chart-toggle {
+    display: flex;
+    gap: 0.4em;
+    margin-bottom: 0.3em;
   }
 
-  .bar-n {
-    font-family: var(--font-mono);
-    font-size: 0.55rem;
-    color: var(--color-text-light);
-    margin-top: 3px;
+  .chart-toggle button {
+    font-family: var(--font-serif);
+    font-size: 0.78rem;
+    padding: 0.3em 0.8em;
+    border: 1.5px solid var(--color-border);
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: var(--color-text-muted);
+  }
+
+  .chart-toggle button:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .chart-toggle button.active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+    font-weight: 600;
   }
 
   .sum-display {
