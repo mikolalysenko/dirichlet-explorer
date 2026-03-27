@@ -52,7 +52,7 @@
   $: xMin = 10;
   $: xMax = Math.min(maxN, LIMIT);
   $: xScale = (n) => margin.left + (Math.log(n) - Math.log(xMin)) / (Math.log(xMax) - Math.log(xMin)) * pw;
-  $: yMax = 0.35;
+  $: yMax = Math.max(0.35, ...samples.map(s => Math.max(s.density, s.approx))) * 1.08;
   $: yScale = (v) => margin.top + ph - (v / yMax) * ph;
 
   // Paths
@@ -74,8 +74,13 @@
     return ticks;
   })();
 
-  // Y-axis ticks
-  const yTicks = [0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30];
+  // Y-axis ticks (adaptive)
+  $: yTicks = (() => {
+    const step = yMax > 0.3 ? 0.05 : 0.05;
+    const ticks = [];
+    for (let v = 0; v <= yMax; v += step) ticks.push(Math.round(v * 1000) / 1000);
+    return ticks;
+  })();
 
   // Hover state
   let hoverN = null;

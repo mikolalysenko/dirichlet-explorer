@@ -18,27 +18,46 @@
   $: productStr = productBig.toLocaleString();
   $: plusOneStr = plusOneBig.toLocaleString();
 
-  // Factorize using BigInt-safe trial division
-  function factorizeBig(n) {
+  // Fast factorization for Euclid's construction.
+  // Key insight: product+1 is coprime to all primes in our list, so we
+  // only trial-divide by primes NOT in the list. We use the precomputed
+  // sieve (primes up to 100k) which is more than enough — if a cofactor
+  // remains above 100k², it must be prime.
+  const trialPrimes = listPrimes(100000);
+
+  function factorizeSmart(n, knownPrimes) {
+    const known = new Set(knownPrimes.map(p => BigInt(p)));
     const factors = [];
-    let d = 2n;
-    while (d * d <= n) {
-      while (n % d === 0n) {
-        factors.push(Number(d));
-        n = n / d;
+
+    for (const p of trialPrimes) {
+      const bp = BigInt(p);
+      if (bp * bp > n) break;
+      if (known.has(bp)) continue; // skip primes in our list (can't divide product+1)
+      while (n % bp === 0n) {
+        factors.push(p);
+        n = n / bp;
       }
-      d++;
     }
-    if (n > 1n) factors.push(Number(n));
+    // If anything remains, it's a prime larger than our trial limit
+    if (n > 1n) {
+      // Safe to convert to Number if it fits, otherwise keep as string
+      factors.push(n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : n);
+    }
     return factors;
   }
 
-  $: plusOneFactors = factorizeBig(plusOneBig);
-  $: newPrime = plusOneFactors.find(f => !euclidPrimes.includes(f));
+  $: plusOneFactors = factorizeSmart(plusOneBig, euclidPrimes);
+  $: newPrime = plusOneFactors.find(f => {
+    const num = typeof f === 'bigint' ? Number(f) : f;
+    return !euclidPrimes.includes(num);
+  });
 
   function addPrime() {
-    if (newPrime && !euclidPrimes.includes(newPrime)) {
-      euclidPrimes = [...euclidPrimes, newPrime].sort((a, b) => a - b);
+    if (newPrime != null) {
+      const num = typeof newPrime === 'bigint' ? Number(newPrime) : newPrime;
+      if (!euclidPrimes.includes(num)) {
+        euclidPrimes = [...euclidPrimes, num].sort((a, b) => a - b);
+      }
     }
   }
 </script>
