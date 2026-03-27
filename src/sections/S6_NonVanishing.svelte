@@ -131,9 +131,9 @@
   );
 
   $: pzBehavior = (() => {
-    if (pzExp > 0) return { label: '→ 0 (zeros win)', color: '#3b82f6' };
-    if (pzExp < 0) return { label: '→ ∞ (pole wins)', color: '#ef4444' };
-    return { label: '→ finite (balanced)', color: '#22c55e' };
+    if (pzExp > 0) return { label: '→ 0', color: '#3b82f6' };
+    if (pzExp < 0) return { label: '→ ∞', color: '#ef4444' };
+    return { label: '→ finite', color: '#22c55e' };
   })();
 
   const supDigitsLocal = '⁰¹²³⁴⁵⁶⁷⁸⁹';
@@ -364,10 +364,8 @@
         <span class="pz-count">{numZeros}</span>
         <button class="pz-btn" on:click={() => numZeros = Math.min(4, numZeros + 1)}>+</button>
       </div>
-      <span class="pz-formula">
-        {pzFormulaText(numPoles, numZeros)}
-        &nbsp;<strong style="color: {pzBehavior.color}">{pzBehavior.label}</strong>
-      </span>
+      <span class="pz-formula">{pzFormulaText(numPoles, numZeros)}</span>
+      <span class="pz-result" style="color: {pzBehavior.color}"><strong>{pzBehavior.label}</strong></span>
     </div>
 
     <svg viewBox="0 0 {pzPlotW} {pzPlotH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
