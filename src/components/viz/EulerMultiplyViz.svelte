@@ -21,7 +21,7 @@
   $: newPowers = newPrime ? Array.from({ length: maxTerms }, (_, k) => ({
     k,
     value: Math.pow(newPrime, k),
-    label: k === 0 ? '1' : k === 1 ? String(newPrime) : `${newPrime}^${k}`
+    label: k === 0 ? '1' : k === 1 ? String(newPrime) : `${newPrime}${superscript(k)}`
   })) : [];
 
   // All product terms after multiplying
@@ -49,10 +49,15 @@
     return terms;
   }
 
+  const supDigits = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+  function superscript(n) {
+    return String(n).split('').map(d => supDigits[parseInt(d)]).join('');
+  }
+
   function factorLabel(factors) {
     const parts = Object.entries(factors).sort((a, b) => a[0] - b[0]);
     if (parts.length === 0) return '1';
-    return parts.map(([p, e]) => e > 1 ? `${p}^${e}` : p).join('·');
+    return parts.map(([p, e]) => e > 1 ? `${p}${superscript(e)}` : p).join('·');
   }
 
   // For the multiplication grid:

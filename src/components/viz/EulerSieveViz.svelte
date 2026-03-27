@@ -111,7 +111,9 @@
     // Group by prime
     const counts = {};
     for (const p of f) counts[p] = (counts[p] || 0) + 1;
-    return Object.entries(counts).map(([p, e]) => e > 1 ? `${p}^${e}` : p).join('·');
+    const supDigits = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+    const sup = (n) => String(n).split('').map(d => supDigits[parseInt(d)]).join('');
+    return Object.entries(counts).map(([p, e]) => e > 1 ? `${p}${sup(e)}` : p).join('·');
   }
 
   // The geometric series for the last added prime
@@ -119,7 +121,12 @@
   $: geoTerms = lastPrime ? Array.from({ length: 5 }, (_, k) => ({
     k,
     value: Math.pow(lastPrime, -k * s),
-    label: k === 0 ? '1' : `1/${lastPrime}${k > 1 ? '^' + (k * s) : '^' + s}`
+    label: (() => {
+      const sup = (n) => String(n).split('').map(d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[parseInt(d)]).join('');
+      if (k === 0) return '1';
+      const exp = k * s;
+      return `1/${lastPrime}${sup(exp)}`;
+    })()
   })) : [];
 </script>
 

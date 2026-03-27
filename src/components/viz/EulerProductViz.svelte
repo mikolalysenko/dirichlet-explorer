@@ -14,7 +14,10 @@
     const terms = [];
     let power = 1;
     for (let k = 0; k < 5; k++) {
-      terms.push({ k, value: power, label: k === 0 ? '1' : `1/${p}${k > 1 ? `^${k * (s === Math.round(s) ? s : s.toFixed(1))}` : `^${s === Math.round(s) ? s : s.toFixed(1)}`}` });
+      const supDigits = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+      const sup = (n) => String(Math.round(n * 10) / 10).split('').map(c => c === '.' ? '·' : supDigits[parseInt(c)] || c).join('');
+      const exp = k * (s === Math.round(s) ? s : parseFloat(s.toFixed(1)));
+      terms.push({ k, value: power, label: k === 0 ? '1' : `1/${p}${sup(exp)}` });
       power *= term;
     }
     return { p, factor, terms, term };
