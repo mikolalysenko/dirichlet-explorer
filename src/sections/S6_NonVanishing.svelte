@@ -76,6 +76,123 @@
   })();
 
   const charColors = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444'];
+
+  // ── Visualization 1: Complex character contradiction ──────────
+  // Show 1/(s-1) [pole], (s-1)^2 [double zero], and (s-1) [net] near s=1
+  let contradictionS = 1.5;
+
+  const cPlotW = 500;
+  const cPlotH = 220;
+  const cM = { left: 50, right: 15, top: 15, bottom: 35 };
+  const cPW = cPlotW - cM.left - cM.right;
+  const cPH = cPlotH - cM.top - cM.bottom;
+
+  $: cXScale = (s) => cM.left + ((s - 1) / 1.5) * cPW; // s from 1 to 2.5
+  $: cYMax = Math.max(3, 1 / Math.max(0.01, contradictionS - 1) * 1.2);
+  $: cYScale = (v) => cM.top + cPH - (v / cYMax) * cPH;
+
+  // Curve data for the contradiction plot
+  $: cCurves = (() => {
+    const pts = [];
+    for (let i = 0; i <= 120; i++) {
+      const s = 1.005 + (i / 120) * 1.495; // 1.005 to 2.5
+      const pole = 1 / (s - 1);
+      const dblZero = (s - 1) * (s - 1);
+      const net = (s - 1); // (s-1)^2 / (s-1)
+      pts.push({ s, pole, dblZero, net });
+    }
+    return pts;
+  })();
+
+  $: cPolePath = cCurves.map((p, i) => `${i === 0 ? 'M' : 'L'}${cXScale(p.s)},${cYScale(Math.min(p.pole, cYMax))}`).join(' ');
+  $: cNetPath = cCurves.map((p, i) => `${i === 0 ? 'M' : 'L'}${cXScale(p.s)},${cYScale(p.net)}`).join(' ');
+
+  $: cCurrentPole = 1 / Math.max(0.01, contradictionS - 1);
+  $: cCurrentNet = contradictionS - 1;
+
+  // ── Visualization 2: Real character — ζ(s)L(s,χ) divergence ──
+  // Compute ζ(s)*L(s,χ_real) via partial sums with non-negative coefficients
+  import { zetaPartial } from '../lib/lfunctions.js';
+  import { gcd } from '../lib/math-utils.js';
+
+  // Find the real non-principal character (if any)
+  $: realCharIdx = characters.findIndex(c => {
+    if (c.isPrincipal) return false;
+    const vals = [...c.values.values()];
+    return vals.every(v => Math.abs(v[1]) < 0.01);
+  });
+
+  // Compute ζ(s)*L(s,χ) for the real character via direct product
+  $: realProdCurve = (() => {
+    const chi = realCharIdx >= 0 ? characters[realCharIdx] : null;
+    if (!chi) return [];
+    const pts = [];
+    for (let i = 0; i <= 100; i++) {
+      const s = 0.55 + (i / 100) * 3.45; // 0.55 to 4
+      // Compute sum of d_chi(n)/n^s where d_chi(n) = sum_{d|n} chi(d)
+      // This equals ζ(s)*L(s,chi) and has non-negative coefficients
+      let sum = 0;
+      const N = 2000;
+      for (let n = 1; n <= N; n++) {
+        // d_chi(n) = sum of chi(d) for d dividing n
+        let dchi = 0;
+        for (let d = 1; d * d <= n; d++) {
+          if (n % d === 0) {
+            const chiD = chi.values.get(d % q) || [0, 0];
+            dchi += chiD[0];
+            if (d !== n / d) {
+              const chiD2 = chi.values.get((n / d) % q) || [0, 0];
+              dchi += chiD2[0];
+            }
+          }
+        }
+        sum += dchi * Math.pow(n, -s);
+      }
+      pts.push({ s, value: sum });
+    }
+    return pts;
+  })();
+
+  // Partial sums for the lower bound: just Σ 1/m^{2s} for coprime m
+  $: lowerBoundCurve = (() => {
+    const pts = [];
+    for (let i = 0; i <= 100; i++) {
+      const s = 0.55 + (i / 100) * 3.45;
+      let sum = 0;
+      for (let m = 1; m <= 500; m++) {
+        if (gcd(m, q) === 1) sum += Math.pow(m, -2 * s);
+      }
+      pts.push({ s, value: sum });
+    }
+    return pts;
+  })();
+
+  const rPlotW = 550;
+  const rPlotH = 240;
+  const rM = { left: 50, right: 15, top: 15, bottom: 35 };
+  const rPW = rPlotW - rM.left - rM.right;
+  const rPH = rPlotH - rM.top - rM.bottom;
+
+  let realS = 1.5;
+
+  $: rXScale = (s) => rM.left + ((s - 0.5) / 3.5) * rPW;
+  $: rYMax = (() => {
+    const atS = realProdCurve.find(p => Math.abs(p.s - Math.max(realS, 0.55)) < 0.04);
+    return Math.max(5, (atS ? atS.value : 5) * 1.3);
+  })();
+  $: rYScale = (v) => rM.top + rPH - (Math.min(v, rYMax) / rYMax) * rPH;
+
+  $: realProdPath = realProdCurve.map((p, i) => `${i === 0 ? 'M' : 'L'}${rXScale(p.s)},${rYScale(p.value)}`).join(' ');
+  $: lowerBoundPath = lowerBoundCurve.map((p, i) => `${i === 0 ? 'M' : 'L'}${rXScale(p.s)},${rYScale(p.value)}`).join(' ');
+
+  $: realCurrentVal = (() => {
+    const p = realProdCurve.find(p => Math.abs(p.s - Math.max(realS, 0.55)) < 0.04);
+    return p ? p.value : 0;
+  })();
+  $: lowerCurrentVal = (() => {
+    const p = lowerBoundCurve.find(p => Math.abs(p.s - Math.max(realS, 0.55)) < 0.04);
+    return p ? p.value : 0;
+  })();
 </script>
 
 <Section id="nonvanishing" title="The Heart of the Proof" subtitle="Why L(1, χ) can never be zero — the final piece of the puzzle.">
@@ -211,11 +328,68 @@
     </div>
   </div>
 
-  <p>Near <Tex tex="s = 1" />, the pole from <Tex tex="\chi_0" /> makes its factor behave
-  like <Tex tex={String.raw`\frac{1}{s-1}`} />, while each zero contributes a factor of <Tex tex="(s-1)" />.
-  The product would behave like <Tex tex={String.raw`\frac{(s-1)^2}{s-1} = (s-1) \to 0`} /> as <Tex tex="s \to 1" />.
-  But we proved the product is <strong>always &ge; 1</strong>. A quantity that's always &ge; 1 can't approach 0.
-  <strong>Contradiction!</strong></p>
+  <p>Near <Tex tex="s = 1" />, the pole makes its factor behave like <Tex tex={String.raw`\frac{1}{s-1}`} />,
+  while each zero contributes a factor of <Tex tex="(s-1)" />. Drag the slider to see what happens:</p>
+
+  <div class="viz-container">
+    <h4>Pole vs. zeros — what would happen if L(1,χ₁) = 0</h4>
+    <Slider label="s" bind:value={contradictionS} min={1.01} max={2.5} step={0.01} format={v => v.toFixed(2)} />
+
+    <svg viewBox="0 0 {cPlotW} {cPlotH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
+      <defs>
+        <clipPath id="c-clip"><rect x={cM.left} y={cM.top} width={cPW} height={cPH} /></clipPath>
+      </defs>
+
+      <!-- y=1 lower bound -->
+      <line x1={cM.left} y1={cYScale(1)} x2={cPlotW - cM.right} y2={cYScale(1)}
+        stroke="var(--color-prime)" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.6" />
+      <text x={cPlotW - cM.right + 2} y={cYScale(1)} font-size="9" font-family="var(--font-mono)"
+        fill="var(--color-prime)" dominant-baseline="central">≥ 1</text>
+
+      <!-- y=0 -->
+      <line x1={cM.left} y1={cYScale(0)} x2={cPlotW - cM.right} y2={cYScale(0)}
+        stroke="var(--color-border)" stroke-width="0.5" />
+
+      <!-- Axes -->
+      <line x1={cM.left} y1={cM.top} x2={cM.left} y2={cM.top + cPH} stroke="var(--color-border)" stroke-width="1" />
+      <line x1={cM.left} y1={cM.top + cPH} x2={cPlotW - cM.right} y2={cM.top + cPH} stroke="var(--color-border)" stroke-width="1" />
+      <text x={cPlotW / 2} y={cPlotH - 4} text-anchor="middle" font-size="10" fill="var(--color-text-muted)">s</text>
+
+      <!-- s=1 marker -->
+      <line x1={cXScale(1)} y1={cM.top} x2={cXScale(1)} y2={cM.top + cPH}
+        stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="3,3" opacity="0.4" />
+
+      <g clip-path="url(#c-clip)">
+        <!-- 1/(s-1) pole curve -->
+        <path d={cPolePath} fill="none" stroke="#ef4444" stroke-width="2" opacity="0.7" />
+
+        <!-- Net result: (s-1) → 0 -->
+        <path d={cNetPath} fill="none" stroke="var(--color-accent)" stroke-width="2.5" />
+      </g>
+
+      <!-- Current s marker -->
+      <line x1={cXScale(contradictionS)} y1={cM.top} x2={cXScale(contradictionS)} y2={cM.top + cPH}
+        stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
+
+      <!-- Current value dots -->
+      {#if cCurrentPole < cYMax}
+        <circle cx={cXScale(contradictionS)} cy={cYScale(cCurrentPole)} r="4" fill="#ef4444" stroke="white" stroke-width="1.5" />
+      {/if}
+      <circle cx={cXScale(contradictionS)} cy={cYScale(cCurrentNet)} r="5" fill="var(--color-accent)" stroke="white" stroke-width="2" />
+    </svg>
+
+    <div class="contradiction-readout">
+      <span class="c-item" style="color: #ef4444">1/(s−1) = {cCurrentPole > 1000 ? '∞' : cCurrentPole.toFixed(1)} <span class="c-tag pole">pole ↑</span></span>
+      <span class="c-item" style="color: var(--color-accent)">(s−1)²/(s−1) = (s−1) = <strong>{cCurrentNet.toFixed(3)}</strong>
+        {#if cCurrentNet < 1}
+          <span class="c-tag violation">{'<'} 1 — contradiction!</span>
+        {/if}
+      </span>
+    </div>
+  </div>
+
+  <p>The net result (blue curve) is forced toward 0 as <Tex tex="s \to 1" /> — it drops below 1,
+  violating the lower bound we proved. <strong>Contradiction!</strong></p>
 
   <Callout type="insight">
     <p><strong>For complex characters:</strong> <Tex tex="L(1, \chi) \neq 0" /> because a zero
@@ -245,7 +419,62 @@
   <p>But the non-negative coefficients include terms <Tex tex={String.raw`1/m^{2s}`} /> for every
   integer <Tex tex="m" /> coprime to <Tex tex="q" />.
   As <Tex tex={String.raw`s \to 1/2`} />, the sum <Tex tex={String.raw`\sum 1/m^{2s} \to \sum 1/m = \infty`} />.
-  A convergent series can't sum to infinity — <strong>contradiction</strong>!</p>
+  Drag the slider below to see it:</p>
+
+  {#if realCharIdx >= 0}
+    <div class="viz-container">
+      <h4>ζ(s)·L(s, {characters[realCharIdx]?.label}) — diverges at s = 1/2</h4>
+      <Slider label="s" bind:value={realS} min={0.55} max={3} step={0.01} format={v => v.toFixed(2)} />
+
+      <svg viewBox="0 0 {rPlotW} {rPlotH}" preserveAspectRatio="xMidYMid meet" class="contradiction-plot">
+        <defs>
+          <clipPath id="r-clip"><rect x={rM.left} y={rM.top} width={rPW} height={rPH} /></clipPath>
+        </defs>
+
+        <!-- s=1 and s=1/2 markers -->
+        <line x1={rXScale(1)} y1={rM.top} x2={rXScale(1)} y2={rM.top + rPH}
+          stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3,3" opacity="0.4" />
+        <text x={rXScale(1)} y={rM.top - 4} text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="var(--color-text-light)">s=1</text>
+
+        <line x1={rXScale(0.5)} y1={rM.top} x2={rXScale(0.5)} y2={rM.top + rPH}
+          stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
+        <text x={rXScale(0.5)} y={rM.top - 4} text-anchor="middle" font-size="8" font-family="var(--font-mono)" fill="#ef4444" font-weight="600">s=½ (diverges!)</text>
+
+        <!-- Axes -->
+        <line x1={rM.left} y1={rM.top} x2={rM.left} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
+        <line x1={rM.left} y1={rM.top + rPH} x2={rPlotW - rM.right} y2={rM.top + rPH} stroke="var(--color-border)" stroke-width="1" />
+        <text x={rPlotW / 2} y={rPlotH - 4} text-anchor="middle" font-size="10" fill="var(--color-text-muted)">s</text>
+
+        <g clip-path="url(#r-clip)">
+          <!-- Lower bound: Σ 1/m^{2s} (dashed) -->
+          <path d={lowerBoundPath} fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.5" />
+
+          <!-- ζ(s)·L(s,χ) curve -->
+          <path d={realProdPath} fill="none" stroke="var(--color-accent)" stroke-width="2.5" />
+        </g>
+
+        <!-- Current s marker -->
+        <line x1={rXScale(realS)} y1={rM.top} x2={rXScale(realS)} y2={rM.top + rPH}
+          stroke="var(--color-text)" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" />
+
+        <!-- Value dot -->
+        {#if realCurrentVal < rYMax}
+          <circle cx={rXScale(realS)} cy={rYScale(realCurrentVal)} r="5" fill="var(--color-accent)" stroke="white" stroke-width="2" />
+        {/if}
+      </svg>
+
+      <div class="contradiction-readout">
+        <span class="c-item" style="color: var(--color-accent)">ζ(s)·L(s,χ) = <strong>{realCurrentVal > 10000 ? '∞' : realCurrentVal.toFixed(2)}</strong></span>
+        <span class="c-item" style="color: #ef4444">lower bound Σ1/m²ˢ = {lowerCurrentVal > 10000 ? '∞' : lowerCurrentVal.toFixed(2)}
+          {#if realS < 0.7}
+            <span class="c-tag violation">exploding → contradiction!</span>
+          {/if}
+        </span>
+      </div>
+    </div>
+  {/if}
+
+  <p>A convergent series can't sum to infinity — <strong>contradiction!</strong></p>
 
   <Callout>
     <p><strong>In short:</strong> If <Tex tex="L(1, \chi) = 0" /> for a real character, then
@@ -353,4 +582,29 @@
     font-size: 1.1rem;
     color: var(--color-text-muted);
   }
+
+  .contradiction-plot { width: 100%; height: auto; }
+
+  .contradiction-readout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1em;
+    justify-content: center;
+    margin-top: 0.4em;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+
+  .c-item { display: flex; align-items: center; gap: 0.3em; }
+
+  .c-tag {
+    font-size: 0.65rem;
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    font-weight: 600;
+    margin-left: 0.2em;
+  }
+
+  .c-tag.pole { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+  .c-tag.violation { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
 </style>
