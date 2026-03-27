@@ -300,7 +300,7 @@
   <div class="viz-container">
     <h4>L-functions for all characters mod {plotQ}</h4>
     <Slider label="Modulus (q)" bind:value={plotQ} min={3} max={8} />
-    <Slider label="s" bind:value={plotS} min={1.05} max={4} step={0.05} format={v => v.toFixed(2)} />
+    <Slider label="s" bind:value={plotS} min={1.0} max={4} step={0.01} format={v => v.toFixed(2)} />
     <LFunctionPlot q={plotQ} sValue={plotS} />
   </div>
 
