@@ -154,15 +154,14 @@
   </div>
 
   <Callout type="insight">
-    <p><strong>The power of the filter:</strong> By summing over all characters with the right
-    weights, we can write a formula that picks out <em>exactly</em> the primes in one column:</p>
-    <Tex display tex={String.raw`\sum_{\substack{p \text{ prime} \\ p \equiv a \pmod{q}}} \frac{1}{p^s} = \frac{1}{\varphi(q)} \sum_\chi \overline{\chi(a)} \sum_p \frac{\chi(p)}{p^s}`} />
-    <p>The left side is what we want (primes in one column). The right side breaks it into
-    pieces — one for each character — that we can analyze separately.</p>
+    <p><strong>What the filter gives us:</strong> The extraction formula is a perfect sieve —
+    given <em>any</em> sum over all integers, it can pick out just the terms where
+    the integer is in one specific residue class. Feed it a sum that "detects" primes,
+    and you get a sum over primes in exactly one column.</p>
+    <p>But we need that prime-detecting sum. Where does it come from?
+    That's the next piece of the puzzle: <strong>L-functions</strong>,
+    which connect sums over integers to products over primes.</p>
   </Callout>
-
-  <p>Now we have our lens. But to actually use it, we need to connect characters to a
-  "machine" that detects primes. That machine is the <strong>L-function</strong>.</p>
 
 </Section>
 
