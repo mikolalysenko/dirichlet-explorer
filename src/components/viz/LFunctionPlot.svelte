@@ -42,28 +42,29 @@
     });
   })();
 
-  // Adaptive y-axis: scale based on current sValue so the blowup is visible
-  // As sValue approaches 1, the principal character gets huge — expand the axis
+  // Adaptive y-axis: scale to always show the principal character's value at current s
+  // No cap — let it go to 1000+ so the blowup is dramatic
   $: principalAtS = (() => {
-    if (sValue <= 1.0) return 100;
+    if (sValue <= 1.0) return 1000;
     const chi0 = characters.find(c => c.isPrincipal);
     if (!chi0) return 5;
     const val = lFunction(Math.max(sValue, sMin), chi0, 2000);
     return Math.abs(val[0]);
   })();
 
-  $: yMax = Math.max(3, Math.min(100, principalAtS * 1.3));
+  $: yMax = Math.max(3, principalAtS * 1.4);
 
   $: xScale = (s) => margin.left + ((s - sMin) / (sMax - sMin)) * plotW;
   $: yScale = (v) => margin.top + plotH - ((v + 1) / (yMax + 1)) * plotH;
 
-  function pathData(points) {
-    return points.map((p, i) => {
+  // Reactive path generation — recalculates when yMax changes
+  $: pathDatas = curves.map(curve => {
+    return curve.points.map((p, i) => {
       const x = xScale(p.s);
-      const y = yScale(Math.max(-1, Math.min(yMax, p.re)));
+      const y = yScale(p.re);
       return `${i === 0 ? 'M' : 'L'}${x},${y}`;
     }).join(' ');
-  }
+  });
 
   // Current s marker values
   $: currentValues = curves.map(c => {
@@ -138,30 +139,37 @@
       transform="rotate(-90, 15, {height / 2})">L(s, χ)</text>
 
     <!-- s=1 pole marker -->
-    {#if sMin <= 1.01}
-      <line
-        x1={xScale(1)} y1={margin.top}
-        x2={xScale(1)} y2={margin.top + plotH}
-        stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="4,3" opacity="0.5"
-      />
-      <text x={xScale(1)} y={margin.top - 5} text-anchor="middle"
-        font-size="9" font-family="var(--font-mono)" fill="var(--color-prime)" font-weight="600">
-        s = 1 (pole)
-      </text>
-    {/if}
+    <line
+      x1={xScale(1)} y1={margin.top}
+      x2={xScale(1)} y2={margin.top + plotH}
+      stroke="var(--color-prime)" stroke-width="1" stroke-dasharray="4,3" opacity="0.5"
+    />
+    <text x={xScale(1)} y={margin.top - 5} text-anchor="middle"
+      font-size="9" font-family="var(--font-mono)" fill="var(--color-prime)" font-weight="600">
+      s = 1 (pole)
+    </text>
 
-    <!-- Curves -->
-    {#each curves as curve}
-      {#if showAllCharacters || curve.chi.isPrincipal}
-        <path
-          d={pathData(curve.points)}
-          fill="none"
-          stroke={curve.color}
-          stroke-width={curve.chi.isPrincipal ? 2.5 : 1.5}
-          opacity={curve.chi.isPrincipal ? 1 : 0.7}
-        />
-      {/if}
-    {/each}
+    <!-- Clip path for the plot area -->
+    <defs>
+      <clipPath id="plot-clip-{q}">
+        <rect x={margin.left} y={margin.top} width={plotW} height={plotH} />
+      </clipPath>
+    </defs>
+
+    <!-- Curves (clipped to plot area) -->
+    <g clip-path="url(#plot-clip-{q})">
+      {#each curves as curve, idx}
+        {#if showAllCharacters || curve.chi.isPrincipal}
+          <path
+            d={pathDatas[idx]}
+            fill="none"
+            stroke={curve.color}
+            stroke-width={curve.chi.isPrincipal ? 2.5 : 1.5}
+            opacity={curve.chi.isPrincipal ? 1 : 0.7}
+          />
+        {/if}
+      {/each}
+    </g>
 
     <!-- Current s vertical line -->
     {#if sValue >= sMin && sValue <= sMax}
@@ -173,32 +181,21 @@
       />
     {/if}
 
-    <!-- Current value markers -->
-    {#each currentValues as cv}
-      {#if (showAllCharacters || cv.isPrincipal) && cv.re > -1 && cv.re < yMax}
-        <circle
-          cx={xScale(Math.max(sValue, sMin))}
-          cy={yScale(cv.re)}
-          r="4"
-          fill={cv.color}
-          stroke="white"
-          stroke-width="1.5"
-        />
-      {/if}
-    {/each}
-
-    <!-- Off-chart indicator for values above yMax -->
-    {#each currentValues as cv}
-      {#if (showAllCharacters || cv.isPrincipal) && cv.re >= yMax}
-        <text
-          x={xScale(Math.max(sValue, sMin)) + 8} y={margin.top + 12}
-          font-size="10" font-family="var(--font-mono)" font-weight="600"
-          fill={cv.color}
-        >
-          {cv.label} = {cv.re > 1000 ? '∞' : cv.re.toFixed(1)} ↑
-        </text>
-      {/if}
-    {/each}
+    <!-- Current value markers (clipped) -->
+    <g clip-path="url(#plot-clip-{q})">
+      {#each currentValues as cv}
+        {#if showAllCharacters || cv.isPrincipal}
+          <circle
+            cx={xScale(Math.max(sValue, sMin))}
+            cy={yScale(cv.re)}
+            r="5"
+            fill={cv.color}
+            stroke="white"
+            stroke-width="2"
+          />
+        {/if}
+      {/each}
+    </g>
   </svg>
 
   <!-- Legend -->
