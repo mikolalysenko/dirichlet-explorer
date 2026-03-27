@@ -88,7 +88,9 @@
   const cPH = cPlotH - cM.top - cM.bottom;
 
   $: cXScale = (s) => cM.left + ((s - 1) / 1.5) * cPW; // s from 1 to 2.5
-  $: cYMax = Math.max(3, 1 / Math.max(0.01, contradictionS - 1) * 1.2);
+  // Fixed y-axis focused on the 0–3 range so the blue (s-1) curve and the ≥1 line
+  // are the visual focus. The red pole curve shoots off the top — that's the point.
+  const cYMax = 3;
   $: cYScale = (v) => cM.top + cPH - (v / cYMax) * cPH;
 
   // Curve data for the contradiction plot
