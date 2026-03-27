@@ -87,9 +87,9 @@
   const pzPW = pzPlotW - pzM.left - pzM.right;
   const pzPH = pzPlotH - pzM.top - pzM.bottom;
 
-  // Fixed y range: -2 to 6, no clamping
-  const pzYMin = -2;
-  const pzYMaxV = 6;
+  // Y range zoomed out
+  const pzYMin = -4;
+  const pzYMaxV = 12;
 
   const pzXMin = -0.5;
   const pzXMax = 3;
@@ -98,28 +98,37 @@
 
   $: pzExp = numZeros - numPoles;
 
-  $: pzCurve = (() => {
-    const pts = [];
+  // Generate points, but split into left (s<1) and right (s>1) segments
+  // to avoid drawing a line through the asymptote at s=1
+  function evalPZ(s, exp) {
+    const d = s - 1;
+    if (Math.abs(d) < 0.003) return null; // gap at the asymptote
+    if (d > 0) return Math.pow(d, exp);
+    return Math.pow(Math.abs(d), exp) * (exp % 2 === 0 ? 1 : -1);
+  }
+
+  $: pzSegments = (() => {
     const exp = pzExp;
-    for (let i = 0; i <= 300; i++) {
-      const s = pzXMin + (i / 300) * (pzXMax - pzXMin);
-      const d = s - 1;
-      let val;
-      if (Math.abs(d) < 0.002) {
-        val = exp > 0 ? 0 : exp < 0 ? (d > 0 ? 500 : -500) : 1;
-      } else if (d > 0) {
-        val = Math.pow(d, exp);
+    const segments = [];
+    let current = [];
+    for (let i = 0; i <= 400; i++) {
+      const s = pzXMin + (i / 400) * (pzXMax - pzXMin);
+      const val = evalPZ(s, exp);
+      if (val === null || !isFinite(val) || Math.abs(val) > 200) {
+        // Break the segment
+        if (current.length > 1) segments.push(current);
+        current = [];
       } else {
-        val = Math.pow(Math.abs(d), exp) * (exp % 2 === 0 ? 1 : -1);
+        current.push({ s, value: val });
       }
-      pts.push({ s, value: val });
     }
-    return pts;
+    if (current.length > 1) segments.push(current);
+    return segments;
   })();
 
-  $: pzPath = pzCurve.map((p, i) =>
-    `${i === 0 ? 'M' : 'L'}${pzXScale(p.s)},${pzYScale(p.value)}`
-  ).join(' ');
+  $: pzPaths = pzSegments.map(seg =>
+    seg.map((p, i) => `${i === 0 ? 'M' : 'L'}${pzXScale(p.s)},${pzYScale(p.value)}`).join(' ')
+  );
 
   $: pzBehavior = (() => {
     if (pzExp > 0) return { label: '→ 0 (zeros win)', color: '#3b82f6' };
@@ -367,7 +376,7 @@
       </defs>
 
       <!-- Horizontal grid lines -->
-      {#each [-1, 0, 1, 2, 3, 4, 5, 6] as tick}
+      {#each [-4, -2, 0, 1, 2, 4, 6, 8, 10, 12] as tick}
         {#if tick >= pzYMin && tick <= pzYMaxV}
           <line x1={pzM.left} y1={pzYScale(tick)} x2={pzPlotW - pzM.right} y2={pzYScale(tick)}
             stroke={tick === 1 ? 'var(--color-prime)' : 'var(--color-border-light)'}
@@ -400,7 +409,9 @@
         fill="#ef4444" opacity="0.04" />
 
       <g clip-path="url(#pz-clip)">
-        <path d={pzPath} fill="none" stroke={pzBehavior.color} stroke-width="2.5" />
+        {#each pzPaths as path}
+          <path d={path} fill="none" stroke={pzBehavior.color} stroke-width="2.5" />
+        {/each}
       </g>
     </svg>
 
