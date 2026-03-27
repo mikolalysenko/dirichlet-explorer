@@ -552,14 +552,13 @@
   <h4>A series that can only count up</h4>
 
   <p>Consider just <Tex tex={String.raw`\zeta(s) \cdot L(s, \chi)`} /> for a real character.
-  When you expand this as a series <Tex tex={String.raw`\sum a_n/n^s`} />, something special happens:
-  <strong>every coefficient <Tex tex={String.raw`a_n`} /> is non-negative</strong>.</p>
+  When you expand this as a series <Tex tex={String.raw`\sum a_n/n^s`} />, the coefficient
+  <Tex tex={String.raw`a_n`} /> equals the sum <Tex tex={String.raw`\sum_{d | n} \chi(d)`} /> — add up the
+  character values at every divisor of <Tex tex="n" />.</p>
 
-  <p>Why? A real character assigns +1 or −1 to each prime. At a "+1 prime," the two Euler factors
-  combine into a perfect square: <Tex tex={String.raw`\frac{1}{(1-p^{-s})^2}`} />.
-  At a "−1 prime," they combine into <Tex tex={String.raw`\frac{1}{1-p^{-2s}}`} />.
-  Both are geometric series with all non-negative terms. Products of non-negative series
-  stay non-negative.</p>
+  <p>Since a real character only takes the values +1, −1, and 0, this sum is always a whole
+  number. And it turns out that for real characters, <strong>these sums are always ≥ 0</strong>.
+  You can verify it below — every coefficient is non-negative:</p>
 
   {#if realChar}
     <div class="viz-container">
